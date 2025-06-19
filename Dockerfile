@@ -1,5 +1,5 @@
 # Basis-Image auswählen (Python 3.12 ist eine gute Wahl für die meisten Anwendungen)
-FROM python:3.12-slim-buster
+FROM python:3.11-slim-buster
 
 # Arbeitsverzeichnis im Container festlegen
 WORKDIR /app
