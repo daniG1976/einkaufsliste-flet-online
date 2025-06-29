@@ -2,6 +2,7 @@ import os
 import flet as ft
 
 
+
 def main(page: ft.Page):
     page.title = "Unsere Gemeinsame Einkaufsliste"
     page.expand = True
@@ -11,10 +12,10 @@ def main(page: ft.Page):
     page.theme_mode = ft.ThemeMode.DARK
     page.scroll = ft.ScrollMode.AUTO # Aktiviert Scrollen bei Bedarf, falls der Inhalt größer wird
     page.theme = ft.Theme(font_family="Roboto")
+    page.extend_body_behind_appbar = True 
 
 
     def fab_clicked(e):
-            print("FAB clicked")
             page.open(dlg_modal)
             page.update()
 
@@ -28,7 +29,42 @@ def main(page: ft.Page):
     page.floating_action_button_location = ft.FloatingActionButtonLocation.CENTER_FLOAT
     page.update()
 
-    favoriten_anzeige = ft.Ref[ft.Text]() # Umbenannt für Klarheit, war 'favoriten' in Ihrem Code
+    favoriten_anzeige = ft.Ref[ft.Text]()
+    
+    text1 =ft.TextField(
+        value="",
+        label="Artikel eingeben",
+        border_color=ft.Colors.WHITE,
+        expand=True,
+        label_style=ft.TextStyle(color="EAD9C9"),
+        text_style=ft.TextStyle(color="EAD9C9"),
+        cursor_color="EAD9C9",
+        border_radius=ft.border_radius.all(8)
+        )
+    
+    numbers =ft.TextField(
+        keyboard_type=ft.KeyboardType.NUMBER,
+        value="",
+        label="Anzahl eingeben",
+        border_color=ft.Colors.WHITE,
+        expand=True,
+        label_style=ft.TextStyle(color="EAD9C9"),
+        text_style=ft.TextStyle(color="EAD9C9"),
+        cursor_color="EAD9C9",
+        border_radius=ft.border_radius.all(8)
+        )
+    
+    weight =ft.TextField(
+        keyboard_type=ft.KeyboardType.NUMBER,
+        value="",
+        label="Gewicht eingeben",
+        border_color=ft.Colors.WHITE,
+        expand=True,
+        label_style=ft.TextStyle(color="EAD9C9"),
+        text_style=ft.TextStyle(color="EAD9C9"),
+        cursor_color="EAD9C9",
+        border_radius=ft.border_radius.all(8)
+        )
 
     fruits = [
         "Äpfel",
@@ -37,17 +73,25 @@ def main(page: ft.Page):
         "Quark",
         "Wurst",
         "Käse",
-        "Joghurt"
+        "Joghurt",
+        "O-Saft",
+        "Nudeln",
+        "Nutella",
+        "Kaffee"
     ]
 
 
     def handle_picker_change(e):
         selected_index = int(e.control.selected_index)
         if selected_index < len(fruits):
-            favoriten_anzeige.current.value = fruits[selected_index]
+            selected_value = fruits[selected_index]
         else:
-            favoriten_anzeige.current.value = "N/A"
+            selected_value = "N/A"
 
+        # HIER ist die entscheidende Prüfung
+        if favoriten_anzeige.current: # Nur aktualisieren, wenn das Widget existiert
+            favoriten_anzeige.current.value = selected_value
+            favoriten_anzeige.current.update()
         page.update() # Dialog aktualisieren, damit Ref-Text sichtbar wird
 
     cupertino_picker_widget = ft.CupertinoPicker(
@@ -56,52 +100,80 @@ def main(page: ft.Page):
         squeeze=1.2,
         use_magnifier=True,
         on_change=handle_picker_change,
-        controls=[ft.Text(value=f, color=ft.Colors.WHITE) for f in fruits],
+        controls=[ft.Text(value=f, color="EAD9C9") for f in fruits],
         height=200,
        item_extent=40,
     )
+    
+    def add_favorite(e):
+        if favoriten_anzeige.current and favoriten_anzeige.current.value:
+            text1.value = favoriten_anzeige.current.value # Setze den Wert des Textfeldes
+            text1.update()
 
 
+    dialog_gradient = ft.LinearGradient(
+        begin=ft.alignment.top_center,
+        end=ft.alignment.bottom_center,
+        colors=[
+            "#213745",
+            #"EAD9C9", # Startfarbe des Dialog-Gradients
+            "#FF5B8E", # Endfarbe des Dialog-Gradients
+        ],
+    )
+    
+    
     dialog_content_container = ft.Container(
         content=ft.Column(
-            controls= [
+            controls=[
                 ft.Row(
-                    alignment = ft.MainAxisAlignment.START,
+                    alignment=ft.MainAxisAlignment.START,
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     controls=[
-                        ft.Icon(name= ft.Icons.FAVORITE, color=ft.Colors.WHITE, size=30),
+                        ft.IconButton(icon=ft.Icons.FAVORITE, icon_color=ft.Colors.WHITE, icon_size=30, on_click=add_favorite),
                         ft.Container(
                             content=cupertino_picker_widget,
                             expand=True,
                         ),
+                        ft.Text(ref=favoriten_anzeige, value=fruits[0], color=ft.Colors.WHITE, size=16, visible=False),
                     ],
                     expand=True
                 ),
                 ft.Row(
-                    alignment = ft.MainAxisAlignment.START,
+                    alignment=ft.MainAxisAlignment.START,
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     controls=[
-                        ft.Icon(name= ft.Icons.NEW_LABEL, color=ft.Colors.WHITE, size=30),
-                        ft.TextField(label="Artikel eingeben",
-                                     border_color=ft.Colors.WHITE,
-                                     expand=True,
-                                     label_style=ft.TextStyle(color=ft.Colors.WHITE70),
-                                     text_style=ft.TextStyle(color=ft.Colors.WHITE),
-                                     cursor_color=ft.Colors.WHITE,
-                                     border_radius=ft.border_radius.all(8)
-                                    )
+                        ft.IconButton(icon=ft.Icons.NEW_LABEL, icon_color=ft.Colors.WHITE, icon_size=30, on_click=()),
+                        text1,
+                    ],
+                    expand=True
+                ),
+                ft.Row(
+                    alignment=ft.MainAxisAlignment.START,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    controls=[
+                        ft.IconButton(icon=ft.Icons.NUMBERS, icon_color=ft.Colors.WHITE, icon_size=30, on_click=()),
+                        numbers,
+                    ],
+                    expand=True
+                ),
+                ft.Row(
+                    alignment=ft.MainAxisAlignment.START,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    controls=[
+                        ft.IconButton(icon=ft.Icons.SCALE, icon_color=ft.Colors.WHITE, icon_size=30, on_click=()),
+                        weight,
                     ],
                     expand=True
                 )
             ],
-            spacing=15
+            spacing=25
         ),
         width=350,
         padding=20,
-        bgcolor=ft.Colors.BLUE_400,
+        #bgcolor=ft.Colors.BLUE_400,
         border_radius=ft.border_radius.all(10),
     )
-
+    
     def dialog_offer_clicked(e):
         if dialog_offer_button.icon_color == ft.Colors.WHITE: # 'offer' ist der Hauptseiten-Button
             dialog_offer_button.icon_color = ft.Colors.RED
@@ -116,17 +188,35 @@ def main(page: ft.Page):
 
     dialog_offer_button = ft.IconButton(icon=ft.Icons.FONT_DOWNLOAD, icon_color=ft.Colors.WHITE, icon_size=30, on_click=dialog_offer_clicked )
     dialog_add_button = ft.IconButton(icon=ft.Icons.ADD, icon_color=ft.Colors.WHITE, icon_size=30, on_click=dialog_add_clicked)
+    
+    gradient_dialog_container = ft.Container(
+    content=ft.Column( # Nutze eine Column, um Titel, den Haupt-Content und die Aktionen zu stapeln
+        [
+        
+            ft.Text("Wir brauchen:", color=(0xFFEAD9C9), size=30, weight=ft.FontWeight.BOLD),
+            #ft.Divider(height=10, color=ft.Colors.WHITE24), # Optional: Ein Trenner nach dem Titel
+            dialog_content_container, 
+            ft.Row( 
+                controls=[dialog_offer_button, dialog_add_button],
+                alignment=ft.MainAxisAlignment.END,
+            ),
+        ],
+        spacing=10, # Abstand zwischen den Elementen in dieser Column
+        horizontal_alignment=ft.CrossAxisAlignment.CENTER, # Zentriere den Inhalt horizontal in der Column
+    ),
+    padding=12, # Innenabstand für den gesamten Dialoginhalt
+    gradient=dialog_gradient, # Hier wird der Gradient angewendet!
+    border_radius=ft.border_radius.all(10), # Abgerundete Ecken für den Dialog
+
+)
 
     dlg_modal = ft.AlertDialog(
-        bgcolor= ft.Colors.BLUE_400,
-        title=ft.Text("Wir brauchen:", color=ft.Colors.WHITE, size=20, weight=ft.FontWeight.BOLD),
-        content=dialog_content_container, # Korrigierte Referenz zum Dialog-Inhaltscontainer
-        actions=[
-            dialog_offer_button, # Korrigierte Referenz
-            dialog_add_button    # Korrigierte Referenz
-        ],
-        actions_alignment=ft.MainAxisAlignment.END,
-    )
+        bgcolor=ft.Colors.TRANSPARENT,
+        content=gradient_dialog_container,
+        shape=ft.RoundedRectangleBorder(radius=ft.border_radius.all(10)),
+        elevation=10,
+        shadow_color="#213745",
+)
 
 
     gradient_background_container = ft.Container(
