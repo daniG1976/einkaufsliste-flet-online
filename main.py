@@ -1,7 +1,12 @@
 import os
 import flet as ft
 
-
+class ShoppingItem:
+    def __init__(self, name: str, amount: str, unit: str, is_offer: bool):
+        self.name = name
+        self.amount = amount
+        self.unit = unit
+        self.is_offer = is_offer # True, wenn Angebot (rote Farbe), False, wenn normal (weiße Farbe)
 
 def main(page: ft.Page):
     page.title = "Unsere Gemeinsame Einkaufsliste"
@@ -14,6 +19,11 @@ def main(page: ft.Page):
     page.theme = ft.Theme(font_family="Roboto")
     page.extend_body_behind_appbar = True 
 
+    # --- NEU: Liste zum Speichern der ShoppingItem-Objekte ---
+    einkaufsliste_daten: list[ShoppingItem] = []
+
+    # --- NEU: Referenz für die ListView, die die Karten anzeigen wird ---
+    einkaufsliste_ref = ft.Ref[ft.ListView]()
 
     def fab_clicked(e):
             page.open(dlg_modal)
@@ -42,8 +52,8 @@ def main(page: ft.Page):
         border_radius=ft.border_radius.all(8)
         )
     
-    numbers =ft.TextField(
-        keyboard_type=ft.KeyboardType.NUMBER,
+    numbers_field =ft.TextField(
+        #keyboard_type=ft.KeyboardType.NUMBER,
         value="",
         label="Anzahl eingeben",
         border_color=ft.Colors.WHITE,
@@ -54,8 +64,8 @@ def main(page: ft.Page):
         border_radius=ft.border_radius.all(8)
         )
     
-    weight =ft.TextField(
-        keyboard_type=ft.KeyboardType.NUMBER,
+    weight_field =ft.TextField(
+        #keyboard_type=ft.KeyboardType.NUMBER,
         value="",
         label="Gewicht eingeben",
         border_color=ft.Colors.WHITE,
@@ -109,6 +119,137 @@ def main(page: ft.Page):
         if favoriten_anzeige.current and favoriten_anzeige.current.value:
             text1.value = favoriten_anzeige.current.value # Setze den Wert des Textfeldes
             text1.update()
+            
+    def create_shopping_card(item: ShoppingItem):
+        offer_icon_color = ft.Colors.RED if item.is_offer else ft.Colors.WHITE
+
+        def handle_dismiss(e: ft.DismissibleDismissEvent):
+            # Element aus der visuellen Liste (ListView) entfernen
+            if einkaufsliste_ref.current:
+                einkaufsliste_ref.current.controls.remove(e.control)
+            
+            # Element aus der Datenliste (einkaufsliste_daten) entfernen
+            # e.control.data ist hier das ShoppingItem vom Draggable
+            if e.control.data in einkaufsliste_daten:
+                einkaufsliste_daten.remove(e.control.data)
+            
+            page.update()
+
+        dismissible_card = ft.Dismissible(
+            content=ft.Card(
+                content=ft.Container(
+                    padding=10,
+                    content=ft.Row(
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                        controls=[
+                            ft.Icon(
+                                name=ft.Icons.FONT_DOWNLOAD,
+                                color=offer_icon_color,
+                            ),
+                            ft.Text(
+                                value=f"{item.name} ({item.amount} {item.unit})",
+                                color=ft.Colors.WHITE,
+                                size=16,
+                                expand=True,
+                                text_align=ft.TextAlign.START,
+                            ),
+                            ft.IconButton(
+                                icon=ft.Icons.DRAG_INDICATOR,
+                                icon_color=ft.Colors.WHITE,
+                            )
+                        ]
+                    )
+                ),
+                color="#FF5B8E",
+                elevation=5,
+            ),
+            dismiss_direction=ft.DismissDirection.HORIZONTAL, # Kann nach links oder rechts gewischt werden
+            background=ft.Container( # Hintergrund beim Wischen von links nach rechts (z.B. "erledigt")
+                alignment=ft.alignment.center_left,
+                bgcolor=ft.Colors.GREEN_700,
+                content=ft.Icon(ft.Icons.CHECK, color=ft.Colors.WHITE, size=40),
+                padding=ft.padding.only(left=20)
+            ),
+            secondary_background=ft.Container( # Hintergrund beim Wischen von rechts nach links (z.B. "löschen")
+                alignment=ft.alignment.center_right,
+                bgcolor=ft.Colors.RED_700,
+                content=ft.Icon(ft.Icons.DELETE, color=ft.Colors.WHITE, size=40),
+                padding=ft.padding.only(right=20)
+            ),
+            on_dismiss=handle_dismiss, # Wird direkt aufgerufen, sobald der Schwellenwert erreicht ist
+            # on_confirm_dismiss wurde hier entfernt
+            dismiss_thresholds={
+                ft.DismissDirection.START_TO_END: 0.2, # Von links nach rechts wischen
+                ft.DismissDirection.END_TO_START: 0.2, # Von rechts nach links wischen
+            },
+        )
+
+        draggable_card = ft.Draggable(
+            group="shopping_items",
+            content=dismissible_card,
+            content_when_dragging=ft.Container(
+                width=dismissible_card.content.width,
+                height=dismissible_card.content.height,
+                bgcolor="#FF5B8E",
+                border_radius=ft.border_radius.all(10),
+                content=ft.Text(f"Ziehe {item.name}", color=ft.Colors.WHITE70),
+                alignment=ft.alignment.center
+            ),
+            data=item, # Übergib das ShoppingItem-Objekt beim Ziehen, wichtig für handle_dismiss
+        )
+        return draggable_card
+
+    dialog_offer_button = ft.IconButton(icon=ft.Icons.FONT_DOWNLOAD, icon_color=ft.Colors.WHITE, icon_size=30)
+    # Beachte: on_click für dialog_offer_button wird weiter unten im dialog_add_clicked gesetzt
+    # oder du verwendest eine Ref, um seinen Status abzufragen.
+    # Hier eine separate Funktion für den Offer-Button im Dialog
+    def toggle_dialog_offer_button(e):
+        if dialog_offer_button.icon_color == ft.Colors.WHITE:
+            dialog_offer_button.icon_color = ft.Colors.RED
+        else:
+            dialog_offer_button.icon_color = ft.Colors.WHITE
+        dialog_offer_button.update()
+    dialog_offer_button.on_click = toggle_dialog_offer_button # Zuweisung der Toggle-Funktion
+
+
+    def dialog_add_clicked(e):
+        # 1. Werte aus Textfeldern und Picker abrufen
+        item_name = text1.value if text1.value else favoriten_anzeige.current.value
+        item_amount = numbers_field.value
+        item_unit = weight_field.value
+        is_offer = dialog_offer_button.icon_color == ft.Colors.RED # Status des Offer-Buttons
+
+        # 2. Neues ShoppingItem erstellen
+        new_item = ShoppingItem(
+            name=item_name,
+            amount=item_amount,
+            unit=item_unit,
+            is_offer=is_offer
+        )
+
+        # 3. Item zur Datenliste hinzufügen
+        einkaufsliste_daten.append(new_item)
+
+        # 4. Visuelle Karte erstellen
+        item_card = create_shopping_card(new_item)
+
+        # 5. Karte zur ListView hinzufügen und aktualisieren
+        if einkaufsliste_ref.current:
+            einkaufsliste_ref.current.controls.append(item_card)
+            einkaufsliste_ref.current.update()
+
+        # 6. Dialog schließen und Felder zurücksetzen
+        dlg_modal.open = False
+        text1.value = ""
+        numbers_field.value = ""
+        weight_field.value = ""
+        dialog_offer_button.icon_color = ft.Colors.WHITE # Offer-Status zurücksetzen
+        dialog_offer_button.update() # Wichtig, damit der Button-Zustand zurückgesetzt wird
+        page.update() # Seite aktualisieren, um den geschlossenen Dialog und die neue Karte zu zeigen
+
+    dialog_add_button = ft.IconButton(icon=ft.Icons.ADD, icon_color=ft.Colors.WHITE, icon_size=30, on_click=dialog_add_clicked)
+
 
 
     dialog_gradient = ft.LinearGradient(
@@ -152,7 +293,7 @@ def main(page: ft.Page):
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     controls=[
                         ft.IconButton(icon=ft.Icons.NUMBERS, icon_color=ft.Colors.WHITE, icon_size=30, on_click=()),
-                        numbers,
+                        numbers_field,
                     ],
                     expand=True
                 ),
@@ -161,7 +302,7 @@ def main(page: ft.Page):
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     controls=[
                         ft.IconButton(icon=ft.Icons.SCALE, icon_color=ft.Colors.WHITE, icon_size=30, on_click=()),
-                        weight,
+                        weight_field,
                     ],
                     expand=True
                 )
@@ -174,23 +315,9 @@ def main(page: ft.Page):
         border_radius=ft.border_radius.all(10),
     )
     
-    def dialog_offer_clicked(e):
-        if dialog_offer_button.icon_color == ft.Colors.WHITE: # 'offer' ist der Hauptseiten-Button
-            dialog_offer_button.icon_color = ft.Colors.RED
-        else:
-            dialog_offer_button.icon_color = ft.Colors.WHITE
-        dialog_offer_button.update() # Hauptseiten-Button aktualisieren
-
-    def dialog_add_clicked(e):
-        dlg_modal.open = False # Dialog schließen
-        page.update() # Seite aktualisieren
-
-
-    dialog_offer_button = ft.IconButton(icon=ft.Icons.FONT_DOWNLOAD, icon_color=ft.Colors.WHITE, icon_size=30, on_click=dialog_offer_clicked )
-    dialog_add_button = ft.IconButton(icon=ft.Icons.ADD, icon_color=ft.Colors.WHITE, icon_size=30, on_click=dialog_add_clicked)
-    
+  
     gradient_dialog_container = ft.Container(
-    content=ft.Column( # Nutze eine Column, um Titel, den Haupt-Content und die Aktionen zu stapeln
+        content=ft.Column( # Nutze eine Column, um Titel, den Haupt-Content und die Aktionen zu stapeln
         [
         
             ft.Text("Wir brauchen:", color=(0xFFEAD9C9), size=30, weight=ft.FontWeight.BOLD),
@@ -214,7 +341,7 @@ def main(page: ft.Page):
         bgcolor=ft.Colors.TRANSPARENT,
         content=gradient_dialog_container,
         shape=ft.RoundedRectangleBorder(radius=ft.border_radius.all(10)),
-        elevation=10,
+        elevation=3,
         shadow_color="#213745",
 )
 
@@ -252,6 +379,14 @@ def main(page: ft.Page):
     width=page.width,
     vertical_alignment=ft.CrossAxisAlignment.CENTER,
         ),
+                
+        ft.ListView(
+                ref=einkaufsliste_ref, # Referenz zur ListView
+                expand=True, # Wichtig, damit die Liste den verfügbaren Platz einnimmt
+                spacing=10, # Abstand zwischen den Karten
+                padding=10,
+                # controls werden dynamisch hinzugefügt
+            ),
        
     ],
 
