@@ -1,5 +1,6 @@
 import os
 import flet as ft
+import asyncio
 
 class ShoppingItem:
     def __init__(self, name: str, amount: str, unit: str, is_offer: bool):
@@ -26,8 +27,10 @@ def main(page: ft.Page):
     einkaufsliste_ref = ft.Ref[ft.ListView]()
 
     def fab_clicked(e):
-            page.open(dlg_modal)
-            page.update()
+        page.open(dlg_modal)
+        page.update()
+        page.run_async(lambda: asyncio.sleep(0.1)) # Optional, falls focus() alleine nicht reicht
+        page.run_async(lambda: text1.focus())
 
 
     page.floating_action_button = ft.FloatingActionButton(  
@@ -115,6 +118,52 @@ def main(page: ft.Page):
        item_extent=40,
     )
     
+
+# --- Drag-and-Drop Logik START ---
+    # Korrektur: ft.DragTargetAcceptEvent durch ft.DragTargetEvent ersetzen
+    def handle_drag_accept(e: ft.DragTargetEvent): 
+        # Das Element, das gezogen wurde (der Draggable)
+        dragged_draggable = page.get_control(e.src_id)
+        
+        # Das Datenobjekt, das vom gezogenen Element stammt
+        dragged_item_data = dragged_draggable.data 
+
+        # Das ShoppingItem-Objekt, das ZIEL des Drops ist
+        # Hier ist das DragTarget das Control, das das Dropping empfängt.
+        # e.control ist das DragTarget selbst.
+        target_item_data = e.control.data # DragTarget hat das ShoppingItem als data
+        
+        if dragged_item_data and target_item_data:
+            # Finde die Indexe der Elemente in der Datenliste
+            try:
+                old_index = einkaufsliste_daten.index(dragged_item_data)
+                new_index = einkaufsliste_daten.index(target_item_data)
+            except ValueError:
+                # Element nicht gefunden, sollte nicht passieren, aber zur Sicherheit
+                print("Fehler: Gezogenes oder Ziel-Element nicht in der Datenliste gefunden.")
+                return
+
+            # Entferne das gezogene Element aus seiner alten Position
+            einkaufsliste_daten.pop(old_index)
+            # Füge es an der neuen Position ein
+            einkaufsliste_daten.insert(new_index, dragged_item_data)
+
+            # Jetzt die ListView visuell neu rendern
+            update_einkaufsliste_ui()
+
+    def update_einkaufsliste_ui():
+        """Aktualisiert die ListView komplett basierend auf der aktuellen einkaufsliste_daten."""
+        # Lösche alle alten Controls in der ListView
+        if einkaufsliste_ref.current: # Sicherstellen, dass die Referenz existiert
+            einkaufsliste_ref.current.controls.clear()
+            # Erstelle neue Controls basierend auf der aktualisierten einkaufsliste_daten
+            for item in einkaufsliste_daten:
+                einkaufsliste_ref.current.controls.append(create_shopping_card(item))
+            einkaufsliste_ref.current.update()
+            page.update() # Stelle sicher, dass die Seite auch aktualisiert wird
+    # --- Drag-and-Drop Logik ENDE ---
+
+    
     def add_favorite(e):
         if favoriten_anzeige.current and favoriten_anzeige.current.value:
             text1.value = favoriten_anzeige.current.value # Setze den Wert des Textfeldes
@@ -124,20 +173,30 @@ def main(page: ft.Page):
         offer_icon_color = ft.Colors.RED if item.is_offer else ft.Colors.WHITE
 
         def handle_dismiss(e: ft.DismissibleDismissEvent):
-            # Element aus der visuellen Liste (ListView) entfernen
-            if einkaufsliste_ref.current:
-                einkaufsliste_ref.current.controls.remove(e.control)
+            # Diese Zeile ist NICHT MEHR NÖTIG, da update_einkaufsliste_ui() die UI komplett neu aufbaut:
+            # if einkaufsliste_ref.current:
+            #     einkaufsliste_ref.current.controls.remove(e.control)
             
-            # Element aus der Datenliste (einkaufsliste_daten) entfernen
-            # e.control.data ist hier das ShoppingItem vom Draggable
-            if e.control.data in einkaufsliste_daten:
-                einkaufsliste_daten.remove(e.control.data)
+            # Wichtig: Nur das ShoppingItem aus der DATENLISTE entfernen
+            if item in einkaufsliste_daten: # Überprüfen, ob das Element noch in der Datenliste ist
+                einkaufsliste_daten.remove(item) # Das spezifische ShoppingItem-Objekt entfernen
             
-            page.update()
+            # Die Benutzeroberfläche nach dem Entfernen des Elements aus der Datenliste aktualisieren
+            update_einkaufsliste_ui() 
 
+        
         dismissible_card = ft.Dismissible(
             content=ft.Card(
                 content=ft.Container(
+                    border_radius=ft.border_radius.all(10),
+                    gradient=ft.LinearGradient(
+                        begin=ft.alignment.center_left,
+                        end=ft.alignment.center_right,
+                        colors=[
+                        "#213745",
+                        "#FF5B8E",
+                        ],
+                    ),
                     padding=10,
                     content=ft.Row(
                         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
@@ -148,57 +207,62 @@ def main(page: ft.Page):
                                 color=offer_icon_color,
                             ),
                             ft.Text(
-                                value=f"{item.name} ({item.amount} {item.unit})",
+                                value=f"  {item.unit} {item.amount} {item.name}",
                                 color=ft.Colors.WHITE,
-                                size=16,
+                                size=24,
                                 expand=True,
                                 text_align=ft.TextAlign.START,
                             ),
                             ft.IconButton(
                                 icon=ft.Icons.DRAG_INDICATOR,
                                 icon_color=ft.Colors.WHITE,
+                                on_click=None,
                             )
                         ]
                     )
                 ),
-                color="#FF5B8E",
                 elevation=5,
             ),
-            dismiss_direction=ft.DismissDirection.HORIZONTAL, # Kann nach links oder rechts gewischt werden
-            background=ft.Container( # Hintergrund beim Wischen von links nach rechts (z.B. "erledigt")
+            dismiss_direction=ft.DismissDirection.HORIZONTAL,
+            background=ft.Container(
                 alignment=ft.alignment.center_left,
+                border_radius=ft.border_radius.all(10),
                 bgcolor=ft.Colors.GREEN_700,
                 content=ft.Icon(ft.Icons.CHECK, color=ft.Colors.WHITE, size=40),
                 padding=ft.padding.only(left=20)
             ),
-            secondary_background=ft.Container( # Hintergrund beim Wischen von rechts nach links (z.B. "löschen")
+            secondary_background=ft.Container(
                 alignment=ft.alignment.center_right,
+                border_radius=ft.border_radius.all(10),
                 bgcolor=ft.Colors.RED_700,
                 content=ft.Icon(ft.Icons.DELETE, color=ft.Colors.WHITE, size=40),
                 padding=ft.padding.only(right=20)
             ),
-            on_dismiss=handle_dismiss, # Wird direkt aufgerufen, sobald der Schwellenwert erreicht ist
-            # on_confirm_dismiss wurde hier entfernt
+            on_dismiss=handle_dismiss, # Diese Closure bindet 'item' korrekt
             dismiss_thresholds={
-                ft.DismissDirection.START_TO_END: 0.2, # Von links nach rechts wischen
-                ft.DismissDirection.END_TO_START: 0.2, # Von rechts nach links wischen
+                ft.DismissDirection.START_TO_END: 0.2,
+                ft.DismissDirection.END_TO_START: 0.2,
             },
         )
-
-        draggable_card = ft.Draggable(
-            group="shopping_items",
-            content=dismissible_card,
-            content_when_dragging=ft.Container(
-                width=dismissible_card.content.width,
-                height=dismissible_card.content.height,
-                bgcolor="#FF5B8E",
-                border_radius=ft.border_radius.all(10),
-                content=ft.Text(f"Ziehe {item.name}", color=ft.Colors.WHITE70),
-                alignment=ft.alignment.center
+        
+        # Jede Karte wird nun von einem DragTarget umwickelt
+        return ft.DragTarget(
+            group="shopping_items", # Muss derselben Gruppe wie der Draggable angehören
+            content=ft.Draggable(
+                group="shopping_items",
+                content=dismissible_card,
+                content_when_dragging=ft.Container(
+                    width=dismissible_card.content.width,
+                    height=dismissible_card.content.height,
+                    bgcolor=0x80213745,
+                    border_radius=ft.border_radius.all(10),
+                    alignment=ft.alignment.center,
+                ),
+                data=item, # Das ShoppingItem wird mit dem Draggable mitgegeben
             ),
-            data=item, # Übergib das ShoppingItem-Objekt beim Ziehen, wichtig für handle_dismiss
+            on_accept=handle_drag_accept, # Event-Handler, wenn ein Element auf dieses Ziel fällt
+            data=item, # Das ShoppingItem wird auch mit dem DragTarget mitgegeben, damit on_accept es identifizieren kann
         )
-        return draggable_card
 
     dialog_offer_button = ft.IconButton(icon=ft.Icons.FONT_DOWNLOAD, icon_color=ft.Colors.WHITE, icon_size=30)
     # Beachte: on_click für dialog_offer_button wird weiter unten im dialog_add_clicked gesetzt
@@ -214,13 +278,11 @@ def main(page: ft.Page):
 
 
     def dialog_add_clicked(e):
-        # 1. Werte aus Textfeldern und Picker abrufen
         item_name = text1.value if text1.value else favoriten_anzeige.current.value
         item_amount = numbers_field.value
         item_unit = weight_field.value
-        is_offer = dialog_offer_button.icon_color == ft.Colors.RED # Status des Offer-Buttons
+        is_offer = dialog_offer_button.icon_color == ft.Colors.RED
 
-        # 2. Neues ShoppingItem erstellen
         new_item = ShoppingItem(
             name=item_name,
             amount=item_amount,
@@ -228,25 +290,17 @@ def main(page: ft.Page):
             is_offer=is_offer
         )
 
-        # 3. Item zur Datenliste hinzufügen
         einkaufsliste_daten.append(new_item)
+        # Nachdem ein neues Item hinzugefügt wurde, die UI komplett aktualisieren
+        update_einkaufsliste_ui() # NEU: Rufe die Update-Funktion auf
 
-        # 4. Visuelle Karte erstellen
-        item_card = create_shopping_card(new_item)
-
-        # 5. Karte zur ListView hinzufügen und aktualisieren
-        if einkaufsliste_ref.current:
-            einkaufsliste_ref.current.controls.append(item_card)
-            einkaufsliste_ref.current.update()
-
-        # 6. Dialog schließen und Felder zurücksetzen
         dlg_modal.open = False
         text1.value = ""
         numbers_field.value = ""
         weight_field.value = ""
-        dialog_offer_button.icon_color = ft.Colors.WHITE # Offer-Status zurücksetzen
-        dialog_offer_button.update() # Wichtig, damit der Button-Zustand zurückgesetzt wird
-        page.update() # Seite aktualisieren, um den geschlossenen Dialog und die neue Karte zu zeigen
+        dialog_offer_button.icon_color = ft.Colors.WHITE
+        dialog_offer_button.update()
+        page.update()
 
     dialog_add_button = ft.IconButton(icon=ft.Icons.ADD, icon_color=ft.Colors.WHITE, icon_size=30, on_click=dialog_add_clicked)
 
@@ -341,8 +395,8 @@ def main(page: ft.Page):
         bgcolor=ft.Colors.TRANSPARENT,
         content=gradient_dialog_container,
         shape=ft.RoundedRectangleBorder(radius=ft.border_radius.all(10)),
-        elevation=3,
-        shadow_color="#213745",
+        #elevation=3,
+        #shadow_color="#213745",
 )
 
 
