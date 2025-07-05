@@ -1,13 +1,48 @@
-import os
 import flet as ft
+import json # Behalten wir für den Moment, falls noch Referenzen existieren, kann aber später entfernt werden.
+import os # Ebenfalls beibehalten, falls noch Referenzen existieren.
 import asyncio
+import firebase_admin # NEU: Für die Firebase-Verwaltung
+from firebase_admin import credentials, db # NEU: Für Authentifizierung und Datenbankzugriff
+import threading
 
 class ShoppingItem:
     def __init__(self, name: str, amount: str, unit: str, is_offer: bool):
         self.name = name
         self.amount = amount
         self.unit = unit
-        self.is_offer = is_offer # True, wenn Angebot (rote Farbe), False, wenn normal (weiße Farbe)
+        self.is_offer = is_offer
+
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "amount": self.amount,
+            "unit": self.unit,
+            "is_offer": self.is_offer
+        }
+
+    # --- NEU: Klassenmethode from_dict START ---
+    @classmethod
+    def from_dict(cls, data_dict):
+        # Stellt sicher, dass Standardwerte verwendet werden, falls Felder fehlen
+        return cls(
+            name=data_dict.get("name", "Unbekannt"),
+            amount=data_dict.get("amount", "1"),
+            unit=data_dict.get("unit", "Stück"),
+            is_offer=data_dict.get("is_offer", False) 
+        )
+    # --- NEU: Klassenmethode from_dict ENDE ---
+
+    def __eq__(self, other):
+        if not isinstance(other, ShoppingItem):
+            return NotImplemented
+        return self.name == other.name and \
+               self.amount == other.amount and \
+               self.unit == other.unit and \
+               self.is_offer == other.is_offer
+
+    def __hash__(self):
+        return hash((self.name, self.amount, self.unit, self.is_offer))
 
 def main(page: ft.Page):
     page.title = "Unsere Gemeinsame Einkaufsliste"
@@ -19,18 +54,125 @@ def main(page: ft.Page):
     page.scroll = ft.ScrollMode.AUTO # Aktiviert Scrollen bei Bedarf, falls der Inhalt größer wird
     page.theme = ft.Theme(font_family="Roboto")
     page.extend_body_behind_appbar = True 
+    
+    # --- Firebase-Initialisierung START ---
+    try:
+        cred = credentials.Certificate("firebase_credentials.json")
+        if not firebase_admin._apps:
+            firebase_admin.initialize_app(cred, {
+                'databaseURL': 'https://einkaufs-app-ae8e9-default-rtdb.europe-west1.firebasedatabase.app/' # <<<<< HIER ERSETZEN! >>>>>
+            })
+            print("Firebase erfolgreich initialisiert.")
+        else:
+            print("Firebase bereits initialisiert (Hot Reload).")
+
+        db_ref = db.reference('/einkaufsliste')
+    except Exception as e:
+        print(f"Fehler bei der Firebase-Initialisierung: {e}")
+        page.add(ft.Text(f"Fehler beim Starten der App: {e}", color=ft.Colors.RED))
+        page.update()
+        return
+    # --- Firebase-Initialisierung ENDE ---
+    
+    # --- NEU: save_data Funktion START ---
+    def save_data():
+        try:
+            # Konvertiere die aktuelle Liste der ShoppingItem-Objekte in eine Liste von Dictionaries
+            data_to_save = [item.to_dict() for item in einkaufsliste_daten]
+            # Speichere die gesamte Liste unter dem definierten Pfad in Firebase
+            db_ref.set(data_to_save) 
+            print("Daten erfolgreich in Firebase gespeichert.")
+        except Exception as e:
+            print(f"Fehler beim Speichern der Daten in Firebase: {e}")
+    # --- NEU: save_data Funktion ENDE ---
+
+    # --- NEU: load_and_listen_data Funktion START (inkl. Echtzeit-Listener) ---
+    def load_and_listen_data():
+        try:
+            # Der Firebase-Listener wird ausgelöst, wann immer sich Daten unter db_ref ändern.
+            # 'event' enthält die aktualisierten Daten.
+            def firebase_data_listener(event):
+                print(f"Firebase-Datenänderung erkannt: {event.event_type} at {event.path}")
+                
+                # Wenn Daten vorhanden sind, aktualisiere unsere einkaufsliste_daten
+                if event.data:
+                    new_data_from_firebase = []
+                    # Firebase Realtime Database speichert Listen als Objekte mit fortlaufenden
+                    # Integer-Keys, wenn die Liste nicht "dicht" ist oder leer war.
+                    # Wenn es eine dichte Liste ist, kommt es als Array.
+                    if isinstance(event.data, dict):
+                        # Falls es als Dictionary von Objekten kommt (z.B. {"0": {...}, "1": {...}})
+                        # Sortiere nach den numerischen Schlüsseln
+                        sorted_keys = sorted(event.data.keys(), key=lambda k: int(k))
+                        for key in sorted_keys:
+                            new_data_from_firebase.append(ShoppingItem.from_dict(event.data[key]))
+                    elif isinstance(event.data, list):
+                        # Falls es direkt als Python-Liste von Dictionaries kommt
+                        for item_dict in event.data:
+                            new_data_from_firebase.append(ShoppingItem.from_dict(item_dict))
+                    else:
+                        print(f"Unerwartetes Datenformat von Firebase: {type(event.data)}. Leere Liste.")
+                        new_data_from_firebase = [] # Bei unerwartetem Format leeren
+                    
+                    # Aktualisiere die interne Datenliste
+                    einkaufsliste_daten.clear()
+                    einkaufsliste_daten.extend(new_data_from_firebase)
+                    
+                    # Wichtig: UI-Updates müssen im Haupt-Thread von Flet erfolgen.
+                    # page.run_task stellt dies sicher.
+                    page.run_task(update_einkaufsliste_ui) 
+                else:
+                    # Wenn event.data leer ist (z.B. Liste wurde gelöscht oder ist initial leer)
+                    if einkaufsliste_daten: # Nur leeren, wenn nicht schon leer
+                        einkaufsliste_daten.clear()
+                        page.run_task(update_einkaufsliste_ui)
+
+            # Starte den Listener. Dieser Aufruf initialisiert die Verbindung und
+            # ruft den firebase_data_listener bei jeder Änderung der Daten auf.
+            db_ref.listen(firebase_data_listener) 
+            print("Firebase-Echtzeit-Listener erfolgreich gestartet.")
+
+        except Exception as e:
+            print(f"Fehler beim Starten des Firebase-Listeners: {e}")
+            page.run_task(lambda: page.add(ft.Text(f"Fehler beim Laden der Einkaufsliste: {e}", color=ft.colors.RED)))
+    # --- NEU: load_and_listen_data Funktion ENDE ---
+
+    
+    def scroll_to_control(e):
+        # KORREKTUR: Scrolle die ListView (einkaufsliste_ref.current) zum geklickten Control
+        if einkaufsliste_ref.current: # Sicherstellen, dass die ListView existiert
+            einkaufsliste_ref.current.scroll_to(e.control) # <<< HIER ÄNDERN!
+            # Optional: Wenn du wieder eine Ausrichtung möchtest (z.B. 0.3 für das obere Drittel):
+            # einkaufsliste_ref.current.scroll_to(e.control, alignment=0.3)
+            # page.update() # Stelle sicher, dass das Update gesendet wird
+
 
     # --- NEU: Liste zum Speichern der ShoppingItem-Objekte ---
     einkaufsliste_daten: list[ShoppingItem] = []
 
     # --- NEU: Referenz für die ListView, die die Karten anzeigen wird ---
     einkaufsliste_ref = ft.Ref[ft.ListView]()
+    new_item_name_input = ft.Ref[ft.TextField]() 
 
     def fab_clicked(e):
-        page.open(dlg_modal)
-        page.update()
-        page.run_async(lambda: asyncio.sleep(0.1)) # Optional, falls focus() alleine nicht reicht
-        page.run_async(lambda: text1.focus())
+        # KORREKTUR: AlertDialog mit page.open() öffnen, wie es in der Flet-Doku steht
+        page.open(dlg_modal) 
+
+        # Asynchrone Hilfsfunktion, um den Fokus nach kurzer Verzögerung zu setzen
+        async def set_focus_on_dialog_input():
+            # Kurze Pause, um sicherzustellen, dass der Dialog vollständig gerendert ist
+            await asyncio.sleep(0.1) 
+            if new_item_name_input.current:
+                new_item_name_input.current.focus()
+                # Optional: page.update() hier, falls der Cursor nicht sofort sichtbar ist
+                # focus() löst intern oft schon ein Update aus, aber hier schadet es nicht
+                page.update() 
+            else:
+                print("Fehler: new_item_name_input.current ist nicht verfügbar nach Dialogöffnung.")
+
+        # Diese Hilfsfunktion wird nun asynchron über page.run_task ausgeführt
+        # Wichtig: Die Hilfsfunktion aufrufen (Parenthese nach dem Namen!)
+        page.run_task(set_focus_on_dialog_input)
 
 
     page.floating_action_button = ft.FloatingActionButton(  
@@ -52,7 +194,9 @@ def main(page: ft.Page):
         label_style=ft.TextStyle(color="EAD9C9"),
         text_style=ft.TextStyle(color="EAD9C9"),
         cursor_color="EAD9C9",
-        border_radius=ft.border_radius.all(8)
+        border_radius=ft.border_radius.all(8),
+        on_focus=scroll_to_control,
+        ref=new_item_name_input, 
         )
     
     numbers_field =ft.TextField(
@@ -64,7 +208,8 @@ def main(page: ft.Page):
         label_style=ft.TextStyle(color="EAD9C9"),
         text_style=ft.TextStyle(color="EAD9C9"),
         cursor_color="EAD9C9",
-        border_radius=ft.border_radius.all(8)
+        border_radius=ft.border_radius.all(8),
+        on_focus=scroll_to_control 
         )
     
     weight_field =ft.TextField(
@@ -76,7 +221,8 @@ def main(page: ft.Page):
         label_style=ft.TextStyle(color="EAD9C9"),
         text_style=ft.TextStyle(color="EAD9C9"),
         cursor_color="EAD9C9",
-        border_radius=ft.border_radius.all(8)
+        border_radius=ft.border_radius.all(8),
+        on_focus=scroll_to_control 
         )
 
     fruits = [
@@ -147,22 +293,18 @@ def main(page: ft.Page):
             einkaufsliste_daten.pop(old_index)
             # Füge es an der neuen Position ein
             einkaufsliste_daten.insert(new_index, dragged_item_data)
-
+            save_data()
             # Jetzt die ListView visuell neu rendern
-            update_einkaufsliste_ui()
+            page.run_task(update_einkaufsliste_ui)
 
-    def update_einkaufsliste_ui():
+    async def update_einkaufsliste_ui():
         """Aktualisiert die ListView komplett basierend auf der aktuellen einkaufsliste_daten."""
-        # Lösche alle alten Controls in der ListView
-        if einkaufsliste_ref.current: # Sicherstellen, dass die Referenz existiert
+        if einkaufsliste_ref.current:
             einkaufsliste_ref.current.controls.clear()
-            # Erstelle neue Controls basierend auf der aktualisierten einkaufsliste_daten
             for item in einkaufsliste_daten:
                 einkaufsliste_ref.current.controls.append(create_shopping_card(item))
-            einkaufsliste_ref.current.update()
-            page.update() # Stelle sicher, dass die Seite auch aktualisiert wird
-    # --- Drag-and-Drop Logik ENDE ---
-
+            einkaufsliste_ref.current.update() # Dies ist korrekt für ListView
+            page.update()
     
     def add_favorite(e):
         if favoriten_anzeige.current and favoriten_anzeige.current.value:
@@ -179,10 +321,11 @@ def main(page: ft.Page):
             
             # Wichtig: Nur das ShoppingItem aus der DATENLISTE entfernen
             if item in einkaufsliste_daten: # Überprüfen, ob das Element noch in der Datenliste ist
-                einkaufsliste_daten.remove(item) # Das spezifische ShoppingItem-Objekt entfernen
+                einkaufsliste_daten.remove(item)
+                save_data()
             
             # Die Benutzeroberfläche nach dem Entfernen des Elements aus der Datenliste aktualisieren
-            update_einkaufsliste_ui() 
+            page.run_task(update_einkaufsliste_ui)
 
         
         dismissible_card = ft.Dismissible(
@@ -291,10 +434,11 @@ def main(page: ft.Page):
         )
 
         einkaufsliste_daten.append(new_item)
+        save_data()
         # Nachdem ein neues Item hinzugefügt wurde, die UI komplett aktualisieren
-        update_einkaufsliste_ui() # NEU: Rufe die Update-Funktion auf
+        page.run_task(update_einkaufsliste_ui)
 
-        dlg_modal.open = False
+        page.close(dlg_modal)# Schließe den Dialog über die Seitenreferenz
         text1.value = ""
         numbers_field.value = ""
         weight_field.value = ""
@@ -460,6 +604,8 @@ def main(page: ft.Page):
     )
 
     page.add(gradient_background_container)
+    
+    load_and_listen_data()
 
 
 ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=int(os.environ.get("PORT", 8550)), host="0.0.0.0") 
