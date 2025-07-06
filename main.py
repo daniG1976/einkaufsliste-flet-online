@@ -55,24 +55,55 @@ def main(page: ft.Page):
     page.theme = ft.Theme(font_family="Roboto")
     page.extend_body_behind_appbar = True 
     
-    # --- Firebase-Initialisierung START ---
+        # --- Firebase-Initialisierung START (Angepasst für Render) ---
     try:
-        cred = credentials.Certificate("firebase_credentials.json")
+        # Versuchen, die Umgebungsvariable zu lesen
+        firebase_credentials_json_string = os.getenv("FIREBASE_CREDENTIALS_JSON_CONTENT")
+
+        if firebase_credentials_json_string:
+            # JSON-String parsen
+            cred_data = json.loads(firebase_credentials_json_string)
+            cred = credentials.Certificate(cred_data)
+            print("Firebase-Anmeldeinformationen erfolgreich aus Umgebungsvariable geladen.")
+        else:
+            # Fallback für lokale Entwicklung: Versuchen Sie die Datei zu laden
+            # Dies ist wichtig, damit Ihre App lokal noch funktioniert, wenn die Umgebungsvariable nicht gesetzt ist.
+            cred = credentials.Certificate("firebase_credentials.json")
+            print("Firebase-Anmeldeinformationen erfolgreich aus lokaler Datei geladen.")
+        
+        # Initialisiere Firebase nur, wenn es noch nicht initialisiert wurde
         if not firebase_admin._apps:
             firebase_admin.initialize_app(cred, {
-                'databaseURL': 'https://einkaufs-app-ae8e9-default-rtdb.europe-west1.firebasedatabase.app/' # <<<<< HIER ERSETZEN! >>>>>
+                'databaseURL': 'https://einkaufs-app-ae8e9-default-rtdb.europe-west1.firebasedatabase.app/'
             })
             print("Firebase erfolgreich initialisiert.")
         else:
             print("Firebase bereits initialisiert (Hot Reload).")
 
         db_ref = db.reference('/einkaufsliste')
-    except Exception as e:
-        print(f"Fehler bei der Firebase-Initialisierung: {e}")
-        page.add(ft.Text(f"Fehler beim Starten der App: {e}", color=ft.Colors.RED))
+
+    except FileNotFoundError:
+        # Spezifischer Fehler für fehlende lokale Datei
+        error_msg = "Fehler: 'firebase_credentials.json' nicht gefunden. Stellen Sie sicher, dass sie lokal vorhanden ist oder die Umgebungsvariable auf Render gesetzt ist."
+        print(error_msg)
+        page.add(ft.Text(f"Fehler beim Starten der App: {error_msg}", color=ft.Colors.RED))
         page.update()
         return
-    # --- Firebase-Initialisierung ENDE ---
+    except json.JSONDecodeError as e:
+        # Fehler beim Parsen der JSON-Umgebungsvariable
+        error_msg = f"Fehler beim Parsen der Firebase-Anmeldeinformationen aus der Umgebungsvariable: {e}. Überprüfen Sie das Format."
+        print(error_msg)
+        page.add(ft.Text(f"Fehler beim Starten der App: {error_msg}", color=ft.Colors.RED))
+        page.update()
+        return
+    except Exception as e:
+        # Allgemeine Fehlerbehandlung
+        error_msg = f"Ein unerwarteter Fehler bei der Firebase-Initialisierung ist aufgetreten: {e}"
+        print(error_msg)
+        page.add(ft.Text(f"Fehler beim Starten der App: {error_msg}", color=ft.Colors.RED))
+        page.update()
+        return
+    # --- Firebase-Initialisierung ENDE (Angepasst für Render) ---
     
     # --- NEU: save_data Funktion START ---
     def save_data():
