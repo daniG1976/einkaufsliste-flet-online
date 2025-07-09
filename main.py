@@ -228,13 +228,7 @@ def main(page: ft.Page):
         page.open(duplicate_sheet)
     
     def scroll_to_control(e):
-        # Gehe davon aus, dass das Control eine 'key'-Eigenschaft hat, die als Ziel dient
-        if hasattr(e.control, 'key') and e.control.key:
-            # Hier ist die Änderung: Übergib die ID (key) des Controls
-            einkaufsliste_ref.current.scroll_to(key=e.control.key, duration=500)
-        else:
-            # Fallback, falls das Control keinen Key hat oder du zum Ende scrollen willst
-            einkaufsliste_ref.current.scroll_to(offset=-1, duration=500) # Scrollt zum Ende
+        einkaufsliste_ref.current.scroll_to(offset=-1, duration=500) # -1 scrollt zum Ende
         page.update()
 
 
