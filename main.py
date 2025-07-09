@@ -182,14 +182,60 @@ def main(page: ft.Page):
             page.run_task(lambda: page.add(ft.Text(f"Fehler beim Laden der Einkaufsliste: {e}", color=ft.colors.RED)))
     # --- NEU: load_and_listen_data Funktion ENDE ---
 
+    async def show_duplicate_bottom_sheet(page: ft.Page, item_name: str):
+        # 1. Den Inhalt des Bottom Sheets definieren
+        bottom_sheet_content = ft.Container(
+            #border_radius=12,
+            width=page.width,
+            bgcolor="#213745",
+            content=ft.Column(
+                [
+                    ft.Text(
+                        f'"{item_name}" ist bereits in der Einkaufsliste!',
+                        weight=ft.FontWeight.BOLD,
+                        size=18,
+                        text_align=ft.TextAlign.CENTER
+                    ),
+                    ft.ElevatedButton(
+                        "OK",
+                        color="#EAD9C9",
+                        bgcolor= "#FF5B8E",
+                        on_click=lambda e: page.close(page.bottom_sheet), 
+                        width=300,
+                        height=40,
+
+                    ),
+                ],
+                tight=True,
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER
+            ),
+            padding=ft.padding.all(20),
+        )
+
+        # 2. Das CupertinoBottomSheet-Objekt erstellen und den Inhalt zuweisen
+        # Die 'open' Eigenschaft wird hier NICHT verwendet
+        # Stattdessen wird es durch page.open() geöffnet
+        duplicate_sheet = ft.CupertinoBottomSheet(
+            content=bottom_sheet_content,
+            # Optional: Wenn es nicht durch Klicken außerhalb geschlossen werden soll
+            modal=True
+        )
+
+        # 3. Das Bottom Sheet der Seite zuweisen (vor dem Öffnen)
+        page.bottom_sheet = duplicate_sheet
+
+        # 4. Das Bottom Sheet öffnen
+        page.open(duplicate_sheet)
     
     def scroll_to_control(e):
-        # KORREKTUR: Scrolle die ListView (einkaufsliste_ref.current) zum geklickten Control
-        if einkaufsliste_ref.current: # Sicherstellen, dass die ListView existiert
-            einkaufsliste_ref.current.scroll_to(e.control) # <<< HIER ÄNDERN!
-            # Optional: Wenn du wieder eine Ausrichtung möchtest (z.B. 0.3 für das obere Drittel):
-            # einkaufsliste_ref.current.scroll_to(e.control, alignment=0.3)
-            # page.update() # Stelle sicher, dass das Update gesendet wird
+        # Gehe davon aus, dass das Control eine 'key'-Eigenschaft hat, die als Ziel dient
+        if hasattr(e.control, 'key') and e.control.key:
+            # Hier ist die Änderung: Übergib die ID (key) des Controls
+            einkaufsliste_ref.current.scroll_to(key=e.control.key, duration=500)
+        else:
+            # Fallback, falls das Control keinen Key hat oder du zum Ende scrollen willst
+            einkaufsliste_ref.current.scroll_to(offset=-1, duration=500) # Scrollt zum Ende
+        page.update()
 
 
     # --- NEU: Liste zum Speichern der ShoppingItem-Objekte ---
@@ -467,6 +513,19 @@ def main(page: ft.Page):
 
     def dialog_add_clicked(e):
         item_name = text1.value if text1.value else favoriten_anzeige.current.value
+        if item_name and any(item.name.lower() == item_name.lower() for item in einkaufsliste_daten):
+            page.close(dlg_modal)
+            # NEU: Direkter Aufruf der async Funktion, da dialog_add_clicked selbst nicht async ist.
+            # page.run_task kann eine async Funktion direkt nehmen.
+            page.run_task(show_duplicate_bottom_sheet, page, item_name)
+            text1.value = ""
+            numbers_field.value = ""
+            weight_field.value = ""
+            dialog_offer_button.icon_color = ft.Colors.WHITE
+            dialog_offer_button.update()
+            page.update()
+            return 
+        
         item_amount = numbers_field.value
         item_unit = weight_field.value
         is_offer = dialog_offer_button.icon_color == ft.Colors.RED
