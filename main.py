@@ -21,45 +21,44 @@ class ShoppingItem:
             "is_offer": self.is_offer
         }
 
-    # --- NEU: Klassenmethode from_dict START ---
+
     @classmethod
     def from_dict(cls, data_dict):
-        # Stellt sicher, dass Standardwerte verwendet werden, falls Felder fehlen
+
         return cls(
             name=data_dict.get("name", "Unbekannt"),
             amount=data_dict.get("amount", "1"),
             unit=data_dict.get("unit", "Stück"),
             is_offer=data_dict.get("is_offer", False) 
         )
-    # --- NEU: Klassenmethode from_dict ENDE ---
+
 
     def __eq__(self, other):
         if not isinstance(other, ShoppingItem):
             return NotImplemented
         return self.name == other.name and \
-               self.amount == other.amount and \
-               self.unit == other.unit and \
-               self.is_offer == other.is_offer
+            self.amount == other.amount and \
+            self.unit == other.unit and \
+            self.is_offer == other.is_offer
 
     def __hash__(self):
         return hash((self.name, self.amount, self.unit, self.is_offer))
 
 def main(page: ft.Page):
     page.title = "Unsere Gemeinsame Einkaufsliste"
-    page.expand = True
-    page.vertical_alignment = ft.CrossAxisAlignment.START # Elemente oben starten
+    #page.expand = True
+    #page.vertical_alignment = ft.MainAxisAlignment.START
     page.bgcolor = ft.Colors.TRANSPARENT
     page.padding = 0 # Wichtig: Padding der Seite auf 0 setzen, damit der Gradient den ganzen Bildschirm füllt
     page.theme_mode = ft.ThemeMode.DARK
-    page.scroll = ft.ScrollMode.AUTO # Aktiviert Scrollen bei Bedarf, falls der Inhalt größer wird
+    #page.scroll = ft.ScrollMode.AUTO # Aktiviert Scrollen bei Bedarf, falls der Inhalt größer wird
     page.theme = ft.Theme(font_family="Roboto")
-    page.extend_body_behind_appbar = True 
-    
-    # --- Firebase-Initialisierung START (Angepasst für Render) ---
+    #page.extend_body_behind_appbar = True 
+
+
     try:
         # Versuchen, die Umgebungsvariable zu lesen
         firebase_credentials_json_string = os.getenv("FIREBASE_CREDENTIALS_JSON_CONTENT")
-
         # NEU: DEBUG-AUSGABE START - GESICHERT GEGEN NoneType
         if firebase_credentials_json_string: # Hinzugefügte Prüfung!
             print(f"DEBUG: Geladene Firebase-JSON-String (erste 100 Zeichen): {firebase_credentials_json_string[:100]}...")
@@ -82,12 +81,9 @@ def main(page: ft.Page):
                 cred = credentials.Certificate("firebase_credentials.json")
                 print("Firebase-Anmeldeinformationen erfolgreich aus lokaler Datei geladen.")
             except FileNotFoundError:
-                # Dies ist jetzt Teil des umfassenderen try-except-Blocks und wird dort gefangen.
-                # Hier sollte kein 'raise' mehr stehen, da es unten schon behandelt wird.
-                # Wir geben nur eine Meldung aus und lassen die äußere Exception das Handling übernehmen.
                 print("DEBUG: Lokale 'firebase_credentials.json' nicht gefunden.")
                 raise FileNotFoundError("firebase_credentials.json nicht gefunden.") # Wirft ihn zur äußeren Behandlung
-        
+
         # Initialisiere Firebase nur, wenn es noch nicht initialisiert wurde
         if not firebase_admin._apps:
             firebase_admin.initialize_app(cred, {
@@ -105,21 +101,22 @@ def main(page: ft.Page):
         page.add(ft.Text(f"Fehler beim Starten der App: {error_msg}", color=ft.Colors.RED))
         page.update()
         return
+
     except json.JSONDecodeError as e:
         error_msg = f"Fehler beim Parsen der Firebase-Anmeldeinformationen aus der Umgebungsvariable: {e}. Überprüfen Sie das Format."
         print(error_msg)
         page.add(ft.Text(f"Fehler beim Starten der App: {error_msg}", color=ft.Colors.RED))
         page.update()
         return
+
     except Exception as e:
         error_msg = f"Ein unerwarteter Fehler bei der Firebase-Initialisierung ist aufgetreten: {e}"
         print(error_msg)
         page.add(ft.Text(f"Fehler beim Starten der App: {error_msg}", color=ft.Colors.RED))
         page.update()
         return
-# --- Firebase-Initialisierung ENDE (Angepasst für Render) ---
-    
-    # --- NEU: save_data Funktion START ---
+
+
     def save_data():
         try:
             # Konvertiere die aktuelle Liste der ShoppingItem-Objekte in eine Liste von Dictionaries
@@ -129,63 +126,49 @@ def main(page: ft.Page):
             print("Daten erfolgreich in Firebase gespeichert.")
         except Exception as e:
             print(f"Fehler beim Speichern der Daten in Firebase: {e}")
-    # --- NEU: save_data Funktion ENDE ---
 
-    # --- NEU: load_and_listen_data Funktion START (inkl. Echtzeit-Listener) ---
     def load_and_listen_data():
         try:
-            # Der Firebase-Listener wird ausgelöst, wann immer sich Daten unter db_ref ändern.
-            # 'event' enthält die aktualisierten Daten.
             def firebase_data_listener(event):
                 print(f"Firebase-Datenänderung erkannt: {event.event_type} at {event.path}")
-                
-                # Wenn Daten vorhanden sind, aktualisiere unsere einkaufsliste_daten
+
                 if event.data:
                     new_data_from_firebase = []
-                    # Firebase Realtime Database speichert Listen als Objekte mit fortlaufenden
-                    # Integer-Keys, wenn die Liste nicht "dicht" ist oder leer war.
-                    # Wenn es eine dichte Liste ist, kommt es als Array.
                     if isinstance(event.data, dict):
-                        # Falls es als Dictionary von Objekten kommt (z.B. {"0": {...}, "1": {...}})
-                        # Sortiere nach den numerischen Schlüsseln
                         sorted_keys = sorted(event.data.keys(), key=lambda k: int(k))
                         for key in sorted_keys:
                             new_data_from_firebase.append(ShoppingItem.from_dict(event.data[key]))
                     elif isinstance(event.data, list):
-                        # Falls es direkt als Python-Liste von Dictionaries kommt
                         for item_dict in event.data:
                             new_data_from_firebase.append(ShoppingItem.from_dict(item_dict))
                     else:
                         print(f"Unerwartetes Datenformat von Firebase: {type(event.data)}. Leere Liste.")
                         new_data_from_firebase = [] # Bei unerwartetem Format leeren
-                    
-                    # Aktualisiere die interne Datenliste
+
                     einkaufsliste_daten.clear()
                     einkaufsliste_daten.extend(new_data_from_firebase)
-                    
-                    # Wichtig: UI-Updates müssen im Haupt-Thread von Flet erfolgen.
-                    # page.run_task stellt dies sicher.
                     page.run_task(update_einkaufsliste_ui) 
                 else:
-                    # Wenn event.data leer ist (z.B. Liste wurde gelöscht oder ist initial leer)
+
                     if einkaufsliste_daten: # Nur leeren, wenn nicht schon leer
                         einkaufsliste_daten.clear()
                         page.run_task(update_einkaufsliste_ui)
 
-            # Starte den Listener. Dieser Aufruf initialisiert die Verbindung und
-            # ruft den firebase_data_listener bei jeder Änderung der Daten auf.
             db_ref.listen(firebase_data_listener) 
             print("Firebase-Echtzeit-Listener erfolgreich gestartet.")
-
         except Exception as e:
             print(f"Fehler beim Starten des Firebase-Listeners: {e}")
-            page.run_task(lambda: page.add(ft.Text(f"Fehler beim Laden der Einkaufsliste: {e}", color=ft.colors.RED)))
-    # --- NEU: load_and_listen_data Funktion ENDE ---
+            page.run_task(lambda: page.add(ft.Text(f"Fehler beim Laden der Einkaufsliste: {e}", color=ft.Colors.RED)))
+
 
     async def show_duplicate_bottom_sheet(page: ft.Page, item_name: str):
-        # 1. Den Inhalt des Bottom Sheets definieren
+    
+        # NEU: Die Funktion zum Schließen des Dialogs
+        def close_duplicate_sheet(e):
+            duplicate_sheet.open = False
+            page.update()
+
         bottom_sheet_content = ft.Container(
-            #border_radius=12,
             width=page.width,
             bgcolor="#213745",
             content=ft.Column(
@@ -199,11 +182,10 @@ def main(page: ft.Page):
                     ft.ElevatedButton(
                         "OK",
                         color="#EAD9C9",
-                        bgcolor= "#FF5B8E",
-                        on_click=lambda e: page.close(page.bottom_sheet), 
+                        bgcolor="#FF5B8E",
+                        on_click=close_duplicate_sheet, # HIER: die neue Funktion zuweisen
                         width=300,
                         height=40,
-
                     ),
                 ],
                 tight=True,
@@ -212,52 +194,37 @@ def main(page: ft.Page):
             padding=ft.padding.all(20),
         )
 
-        # 2. Das CupertinoBottomSheet-Objekt erstellen und den Inhalt zuweisen
-        # Die 'open' Eigenschaft wird hier NICHT verwendet
-        # Stattdessen wird es durch page.open() geöffnet
         duplicate_sheet = ft.CupertinoBottomSheet(
             content=bottom_sheet_content,
-            # Optional: Wenn es nicht durch Klicken außerhalb geschlossen werden soll
             modal=True
         )
+        
+        page.overlay.append(duplicate_sheet)
+        duplicate_sheet.open = True
+        page.update()
 
-        # 3. Das Bottom Sheet der Seite zuweisen (vor dem Öffnen)
-        page.bottom_sheet = duplicate_sheet
-
-        # 4. Das Bottom Sheet öffnen
-        page.open(duplicate_sheet)
     
     def scroll_to_control(e):
         einkaufsliste_ref.current.scroll_to(offset=-1, duration=500) # -1 scrollt zum Ende
         page.update()
 
 
-    # --- NEU: Liste zum Speichern der ShoppingItem-Objekte ---
     einkaufsliste_daten: list[ShoppingItem] = []
-
-    # --- NEU: Referenz für die ListView, die die Karten anzeigen wird ---
     einkaufsliste_ref = ft.Ref[ft.ListView]()
     new_item_name_input = ft.Ref[ft.TextField]() 
 
     def fab_clicked(e):
-        # KORREKTUR: AlertDialog mit page.open() öffnen, wie es in der Flet-Doku steht
         page.open(dlg_modal) 
 
-        # Asynchrone Hilfsfunktion, um den Fokus nach kurzer Verzögerung zu setzen
         async def set_focus_on_dialog_input():
-            # Kurze Pause, um sicherzustellen, dass der Dialog vollständig gerendert ist
             await asyncio.sleep(0.1) 
             if new_item_name_input.current:
                 new_item_name_input.current.focus()
-                # Optional: page.update() hier, falls der Cursor nicht sofort sichtbar ist
-                # focus() löst intern oft schon ein Update aus, aber hier schadet es nicht
                 page.update() 
             else:
                 print("Fehler: new_item_name_input.current ist nicht verfügbar nach Dialogöffnung.")
-
-        # Diese Hilfsfunktion wird nun asynchron über page.run_task ausgeführt
-        # Wichtig: Die Hilfsfunktion aufrufen (Parenthese nach dem Namen!)
         page.run_task(set_focus_on_dialog_input)
+
 
 
     page.floating_action_button = ft.FloatingActionButton(  
@@ -266,11 +233,13 @@ def main(page: ft.Page):
             bgcolor="#213745",
             shape=ft.CircleBorder(),
         )
+
     page.floating_action_button_location = ft.FloatingActionButtonLocation.CENTER_FLOAT
     page.update()
 
+
     favoriten_anzeige = ft.Ref[ft.Text]()
-    
+
     text1 =ft.TextField(
         value="",
         label="Artikel eingeben",
@@ -283,7 +252,7 @@ def main(page: ft.Page):
         on_focus=scroll_to_control,
         ref=new_item_name_input, 
         )
-    
+
     numbers_field =ft.TextField(
         #keyboard_type=ft.KeyboardType.NUMBER,
         value="",
@@ -296,7 +265,7 @@ def main(page: ft.Page):
         border_radius=ft.border_radius.all(8),
         on_focus=scroll_to_control 
         )
-    
+
     weight_field =ft.TextField(
         #keyboard_type=ft.KeyboardType.NUMBER,
         value="",
@@ -310,148 +279,241 @@ def main(page: ft.Page):
         on_focus=scroll_to_control 
         )
 
+
     fruits = [
         "Äpfel",
         "Bananen",
+
         "Milch",
+
         "Quark",
+
         "Wurst",
+
         "Käse",
+
         "Joghurt",
+
         "O-Saft",
+
         "Nudeln",
+
         "Nutella",
+
         "Kaffee"
+
     ]
 
 
+
     def handle_picker_change(e):
+
         selected_index = int(e.control.selected_index)
+
         if selected_index < len(fruits):
+
             selected_value = fruits[selected_index]
+
         else:
+
             selected_value = "N/A"
 
+
         # HIER ist die entscheidende Prüfung
+
         if favoriten_anzeige.current: # Nur aktualisieren, wenn das Widget existiert
+
             favoriten_anzeige.current.value = selected_value
+
             favoriten_anzeige.current.update()
+
         page.update() # Dialog aktualisieren, damit Ref-Text sichtbar wird
 
+
     cupertino_picker_widget = ft.CupertinoPicker(
+
         selected_index=0,
+
         magnification=1.22,
+
         squeeze=1.2,
+
         use_magnifier=True,
+
         on_change=handle_picker_change,
+
         controls=[ft.Text(value=f, color="EAD9C9") for f in fruits],
+
         height=200,
+
        item_extent=40,
+
     )
+
     
 
+
 # --- Drag-and-Drop Logik START ---
+
     # Korrektur: ft.DragTargetAcceptEvent durch ft.DragTargetEvent ersetzen
-    def handle_drag_accept(e: ft.DragTargetEvent): 
+
+    def handle_drag_accept(e): 
+
         # Das Element, das gezogen wurde (der Draggable)
+
         dragged_draggable = page.get_control(e.src_id)
+
         
+
         # Das Datenobjekt, das vom gezogenen Element stammt
+
         dragged_item_data = dragged_draggable.data 
 
+
         # Das ShoppingItem-Objekt, das ZIEL des Drops ist
+
         # Hier ist das DragTarget das Control, das das Dropping empfängt.
+
         # e.control ist das DragTarget selbst.
+
         target_item_data = e.control.data # DragTarget hat das ShoppingItem als data
+
         
+
         if dragged_item_data and target_item_data:
+
             # Finde die Indexe der Elemente in der Datenliste
+
             try:
+
                 old_index = einkaufsliste_daten.index(dragged_item_data)
+
                 new_index = einkaufsliste_daten.index(target_item_data)
+
             except ValueError:
+
                 # Element nicht gefunden, sollte nicht passieren, aber zur Sicherheit
+
                 print("Fehler: Gezogenes oder Ziel-Element nicht in der Datenliste gefunden.")
+
                 return
 
+
             # Entferne das gezogene Element aus seiner alten Position
+
             einkaufsliste_daten.pop(old_index)
+
             # Füge es an der neuen Position ein
+
             einkaufsliste_daten.insert(new_index, dragged_item_data)
+
             save_data()
+
             # Jetzt die ListView visuell neu rendern
+
             page.run_task(update_einkaufsliste_ui)
 
+
     async def update_einkaufsliste_ui():
-        """Aktualisiert die ListView komplett basierend auf der aktuellen einkaufsliste_daten."""
         if einkaufsliste_ref.current:
             einkaufsliste_ref.current.controls.clear()
             for item in einkaufsliste_daten:
                 einkaufsliste_ref.current.controls.append(create_shopping_card(item))
-            einkaufsliste_ref.current.update() # Dies ist korrekt für ListView
+            einkaufsliste_ref.current.update() 
             page.update()
-    
+
     def add_favorite(e):
         if favoriten_anzeige.current and favoriten_anzeige.current.value:
             text1.value = favoriten_anzeige.current.value # Setze den Wert des Textfeldes
             text1.update()
-            
+
     def create_shopping_card(item: ShoppingItem):
         offer_icon_color = ft.Colors.RED if item.is_offer else ft.Colors.WHITE
-
         def handle_dismiss(e: ft.DismissibleDismissEvent):
-            # Diese Zeile ist NICHT MEHR NÖTIG, da update_einkaufsliste_ui() die UI komplett neu aufbaut:
-            # if einkaufsliste_ref.current:
-            #     einkaufsliste_ref.current.controls.remove(e.control)
-            
-            # Wichtig: Nur das ShoppingItem aus der DATENLISTE entfernen
             if item in einkaufsliste_daten: # Überprüfen, ob das Element noch in der Datenliste ist
                 einkaufsliste_daten.remove(item)
                 save_data()
-            
-            # Die Benutzeroberfläche nach dem Entfernen des Elements aus der Datenliste aktualisieren
             page.run_task(update_einkaufsliste_ui)
 
+
         
+
         dismissible_card = ft.Dismissible(
+
             content=ft.Card(
+
                 content=ft.Container(
+
                     border_radius=ft.border_radius.all(10),
+
                     gradient=ft.LinearGradient(
+
                         begin=ft.alignment.center_left,
+
                         end=ft.alignment.center_right,
+
                         colors=[
+
                         "#213745",
+
                         "#FF5B8E",
+
                         ],
+
                     ),
+
                     padding=10,
+
                     content=ft.Row(
+
                         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
+
                         controls=[
+
                             ft.Icon(
+
                                 name=ft.Icons.FONT_DOWNLOAD,
+
                                 color=offer_icon_color,
+
                             ),
+
                             ft.Text(
+
                                 value=f"  {item.unit} {item.amount} {item.name}",
+
                                 color=ft.Colors.WHITE,
+
                                 size=24,
+
                                 expand=True,
+
                                 text_align=ft.TextAlign.START,
+
                             ),
+
                             ft.IconButton(
+
                                 icon=ft.Icons.DRAG_INDICATOR,
+
                                 icon_color=ft.Colors.WHITE,
+
                                 on_click=None,
+
                             )
+
                         ]
+
                     )
+
                 ),
                 elevation=5,
             ),
+
             dismiss_direction=ft.DismissDirection.HORIZONTAL,
+
             background=ft.Container(
                 alignment=ft.alignment.center_left,
                 border_radius=ft.border_radius.all(10),
@@ -459,6 +521,7 @@ def main(page: ft.Page):
                 content=ft.Icon(ft.Icons.CHECK, color=ft.Colors.WHITE, size=40),
                 padding=ft.padding.only(left=20)
             ),
+
             secondary_background=ft.Container(
                 alignment=ft.alignment.center_right,
                 border_radius=ft.border_radius.all(10),
@@ -466,14 +529,15 @@ def main(page: ft.Page):
                 content=ft.Icon(ft.Icons.DELETE, color=ft.Colors.WHITE, size=40),
                 padding=ft.padding.only(right=20)
             ),
+
             on_dismiss=handle_dismiss, # Diese Closure bindet 'item' korrekt
             dismiss_thresholds={
                 ft.DismissDirection.START_TO_END: 0.2,
                 ft.DismissDirection.END_TO_START: 0.2,
             },
         )
-        
-        # Jede Karte wird nun von einem DragTarget umwickelt
+
+
         return ft.DragTarget(
             group="shopping_items", # Muss derselben Gruppe wie der Draggable angehören
             content=ft.Draggable(
@@ -493,24 +557,22 @@ def main(page: ft.Page):
         )
 
     dialog_offer_button = ft.IconButton(icon=ft.Icons.FONT_DOWNLOAD, icon_color=ft.Colors.WHITE, icon_size=30)
-    # Beachte: on_click für dialog_offer_button wird weiter unten im dialog_add_clicked gesetzt
-    # oder du verwendest eine Ref, um seinen Status abzufragen.
-    # Hier eine separate Funktion für den Offer-Button im Dialog
+
     def toggle_dialog_offer_button(e):
         if dialog_offer_button.icon_color == ft.Colors.WHITE:
             dialog_offer_button.icon_color = ft.Colors.RED
         else:
             dialog_offer_button.icon_color = ft.Colors.WHITE
-        dialog_offer_button.update()
-    dialog_offer_button.on_click = toggle_dialog_offer_button # Zuweisung der Toggle-Funktion
 
+        dialog_offer_button.update()
+
+    dialog_offer_button.on_click = toggle_dialog_offer_button # Zuweisung der Toggle-Funktion
 
     def dialog_add_clicked(e):
         item_name = text1.value if text1.value else favoriten_anzeige.current.value
         if item_name and any(item.name.lower() == item_name.lower() for item in einkaufsliste_daten):
             page.close(dlg_modal)
-            # NEU: Direkter Aufruf der async Funktion, da dialog_add_clicked selbst nicht async ist.
-            # page.run_task kann eine async Funktion direkt nehmen.
+
             page.run_task(show_duplicate_bottom_sheet, page, item_name)
             text1.value = ""
             numbers_field.value = ""
@@ -519,7 +581,7 @@ def main(page: ft.Page):
             dialog_offer_button.update()
             page.update()
             return 
-        
+
         item_amount = numbers_field.value
         item_unit = weight_field.value
         is_offer = dialog_offer_button.icon_color == ft.Colors.RED
@@ -535,8 +597,8 @@ def main(page: ft.Page):
         save_data()
         # Nachdem ein neues Item hinzugefügt wurde, die UI komplett aktualisieren
         page.run_task(update_einkaufsliste_ui)
-
         page.close(dlg_modal)# Schließe den Dialog über die Seitenreferenz
+
         text1.value = ""
         numbers_field.value = ""
         weight_field.value = ""
@@ -545,8 +607,6 @@ def main(page: ft.Page):
         page.update()
 
     dialog_add_button = ft.IconButton(icon=ft.Icons.ADD, icon_color=ft.Colors.WHITE, icon_size=30, on_click=dialog_add_clicked)
-
-
 
     dialog_gradient = ft.LinearGradient(
         begin=ft.alignment.top_center,
@@ -557,65 +617,74 @@ def main(page: ft.Page):
             "#FF5B8E", # Endfarbe des Dialog-Gradients
         ],
     )
-    
+
     
     dialog_content_container = ft.Container(
         content=ft.Column(
             controls=[
+                ft.Text(
+                ref=favoriten_anzeige, # Behalte die Referenz, aber mache den Text unsichtbar
+                value="", # Setze den Wert auf einen leeren String
+                visible=False, # Der entscheidende Schritt: Das Widget ist nicht sichtbar
+                ),
                 ft.Row(
-                    alignment=ft.MainAxisAlignment.START,
-                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     controls=[
                         ft.IconButton(icon=ft.Icons.FAVORITE, icon_color=ft.Colors.WHITE, icon_size=30, on_click=add_favorite),
                         ft.Container(
                             content=cupertino_picker_widget,
-                            expand=True,
+                            width=250,
+                            height=200
                         ),
-                        ft.Text(ref=favoriten_anzeige, value=fruits[0], color=ft.Colors.WHITE, size=16, visible=False),
                     ],
-                    expand=True
-                ),
-                ft.Row(
                     alignment=ft.MainAxisAlignment.START,
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                    controls=[
-                        ft.IconButton(icon=ft.Icons.NEW_LABEL, icon_color=ft.Colors.WHITE, icon_size=30, on_click=()),
-                        text1,
-                    ],
-                    expand=True
                 ),
                 ft.Row(
+                    controls=[
+                        ft.IconButton(icon=ft.Icons.NEW_LABEL, icon_color=ft.Colors.WHITE, icon_size=30, on_click=None),
+                        ft.Container(
+                            content=text1,
+                            width=250,
+                        )
+                    ],
                     alignment=ft.MainAxisAlignment.START,
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                    controls=[
-                        ft.IconButton(icon=ft.Icons.NUMBERS, icon_color=ft.Colors.WHITE, icon_size=30, on_click=()),
-                        numbers_field,
-                    ],
-                    expand=True
                 ),
                 ft.Row(
+                    controls=[
+                        ft.IconButton(icon=ft.Icons.NUMBERS, icon_color=ft.Colors.WHITE, icon_size=30, on_click=None),
+                        ft.Container(
+                            content=numbers_field,
+                            width=250,
+                        )
+                    ],
                     alignment=ft.MainAxisAlignment.START,
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                ),
+                ft.Row(
                     controls=[
-                        ft.IconButton(icon=ft.Icons.SCALE, icon_color=ft.Colors.WHITE, icon_size=30, on_click=()),
-                        weight_field,
+                        ft.IconButton(icon=ft.Icons.SCALE, icon_color=ft.Colors.WHITE, icon_size=30, on_click=None),
+                        ft.Container(
+                            content=weight_field,
+                            width=250,
+                        )
                     ],
-                    expand=True
-                )
+                    alignment=ft.MainAxisAlignment.START,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                ),
             ],
-            spacing=25
+            spacing=25,
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
         ),
         width=350,
         padding=20,
-        #bgcolor=ft.Colors.BLUE_400,
         border_radius=ft.border_radius.all(10),
-    )
+        )
     
-  
+
     gradient_dialog_container = ft.Container(
         content=ft.Column( # Nutze eine Column, um Titel, den Haupt-Content und die Aktionen zu stapeln
         [
-        
             ft.Text("Wir brauchen:", color=(0xFFEAD9C9), size=30, weight=ft.FontWeight.BOLD),
             #ft.Divider(height=10, color=ft.Colors.WHITE24), # Optional: Ein Trenner nach dem Titel
             dialog_content_container, 
@@ -630,80 +699,82 @@ def main(page: ft.Page):
     padding=12, # Innenabstand für den gesamten Dialoginhalt
     gradient=dialog_gradient, # Hier wird der Gradient angewendet!
     border_radius=ft.border_radius.all(10), # Abgerundete Ecken für den Dialog
-
 )
+
 
     dlg_modal = ft.AlertDialog(
         bgcolor=ft.Colors.TRANSPARENT,
         content=gradient_dialog_container,
         shape=ft.RoundedRectangleBorder(radius=ft.border_radius.all(10)),
-        #elevation=3,
-        #shadow_color="#213745",
+
 )
 
+    #page.padding = 0
+    #page.spacing = 0
 
-    gradient_background_container = ft.Container(
-        expand=True,
-        width=page.width,
-        height=page.height,
-        content=ft.Column(
+    page.add(
+        ft.Stack(
             [
-                ft.Row(
+                # Schicht 1: Der Hintergrund, der den ganzen Platz einnimmt
+                ft.Container(
+                    expand=True,
+                    gradient=ft.LinearGradient(
+                        begin=ft.alignment.top_center,
+                        end=ft.alignment.bottom_center,
+                        colors=["#EAD9C9", "#FF5B8E"],
+                    ),
+                ),
+                # Schicht 2: Der Hauptinhalt der App, der den ganzen Platz einnimmt
+                ft.Column(
                     [
-        ft.Container(width=50),  # linker Platzhalter
-        ft.Container(
-            expand=True,
-            content=ft.Text(
-                "Meine Einkaufsliste",
-                size=28,
-                weight=ft.FontWeight.BOLD,
-                color="#213745",
-                text_align=ft.TextAlign.CENTER,
-            ),
-        ),
-        ft.Container(
-            ft.PopupMenuButton(
-                icon_color = "#213745",
-                items=[
-                    ft.PopupMenuItem(text="Item 1"),
-                    ft.PopupMenuItem(text="Item 2"),
-                ]
-            ),
-            width=50,  # rechter Bereich
-        ),
-    ],
-    width=page.width,
-    vertical_alignment=ft.CrossAxisAlignment.CENTER,
-        ),
-                
-        ft.ListView(
-                ref=einkaufsliste_ref, # Referenz zur ListView
-                expand=True, # Wichtig, damit die Liste den verfügbaren Platz einnimmt
-                spacing=10, # Abstand zwischen den Karten
-                padding=10,
-                # controls werden dynamisch hinzugefügt
-            ),
-       
-    ],
-
-        expand=True,
-        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-        spacing=20 # Abstand zwischen den Elementen in der Spalte
-        ),
-        gradient=ft.LinearGradient(
-            begin=ft.alignment.top_center, # Startpunkt des Verlaufs (oben mittig)
-            end=ft.alignment.bottom_center, # Endpunkt des Verlaufs (unten mittig
-            # Deine gewählten Farben
-            colors=[
-                "#EAD9C9", # Ein tiefes Lila
-                "#FF5B8E", # Ein dunkleres Lila
+                        # Header
+                        ft.Container(
+                            content=ft.Row(
+                                [
+                                    ft.Container(width=50),
+                                    ft.Container(
+                                        expand=True,
+                                        content=ft.Text(
+                                            "Meine Einkaufsliste",
+                                            size=30,
+                                            weight=ft.FontWeight.BOLD,
+                                            color="#213745",
+                                            text_align=ft.TextAlign.CENTER,
+                                        ),
+                                    ),
+                                    ft.Container(
+                                        ft.PopupMenuButton(
+                                            icon_color="#213745",
+                                            items=[
+                                                ft.PopupMenuItem(text="Einstellungen"),
+                                                ft.PopupMenuItem(text="Über"),
+                                            ]
+                                        ),
+                                        width=50,
+                                    ),
+                                ],
+                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                            ),
+                            padding=ft.padding.only(top=40, bottom=20),
+                            alignment=ft.alignment.center,
+                        ),
+                        # Liste der Elemente
+                        ft.ListView(
+                            ref=einkaufsliste_ref,
+                            expand=True,
+                            spacing=10,
+                            padding=20,
+                        ),
+                    ],
+                    expand=True,
+                    alignment=ft.MainAxisAlignment.START,
+                ),
             ],
-        ),
+            expand=True,
+        )
     )
 
-    page.add(gradient_background_container)
-    
+    page.update()
     load_and_listen_data()
 
-
-ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=int(os.environ.get("PORT", 8550)), host="0.0.0.0") 
+ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=int(os.environ.get("PORT", 8550)), host="0.0.0.0")  
