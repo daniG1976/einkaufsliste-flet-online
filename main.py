@@ -45,6 +45,7 @@ class ShoppingItem:
         return hash((self.name, self.amount, self.unit, self.is_offer))
 
 def main(page: ft.Page):
+    page.resize_to_avoid_bottom_inset = True
     page.title = "Unsere Gemeinsame Einkaufsliste"
     #page.expand = True
     #page.vertical_alignment = ft.MainAxisAlignment.START
@@ -640,6 +641,7 @@ def main(page: ft.Page):
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
             ],
+            scroll=True,
             spacing=25,
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
         ),
@@ -673,7 +675,7 @@ def main(page: ft.Page):
         bgcolor=ft.Colors.TRANSPARENT,
         content=gradient_dialog_container,
         shape=ft.RoundedRectangleBorder(radius=ft.border_radius.all(10)),
-        content_padding=ft.padding.only(left=30, right=30)
+        content_padding=ft.padding.only(left=18, right=18)
 
 )
 
