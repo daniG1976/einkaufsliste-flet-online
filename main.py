@@ -643,7 +643,7 @@ def main(page: ft.Page):
             spacing=25,
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
         ),
-        #width=350,
+        width=350,
         padding=20,
         border_radius=ft.border_radius.all(10),
         )
@@ -673,6 +673,7 @@ def main(page: ft.Page):
         bgcolor=ft.Colors.TRANSPARENT,
         content=gradient_dialog_container,
         shape=ft.RoundedRectangleBorder(radius=ft.border_radius.all(10)),
+        content_padding=ft.padding.only(left=30, right=30)
 
 )
 
