@@ -600,8 +600,7 @@ def main(page: ft.Page):
                         ft.IconButton(icon=ft.Icons.FAVORITE, icon_color=ft.Colors.WHITE, icon_size=30, on_click=add_favorite),
                         ft.Container(
                             content=cupertino_picker_widget,
-                            width=250,
-                            height=200
+                            expand=True,
                         ),
                     ],
                     alignment=ft.MainAxisAlignment.START,
@@ -612,7 +611,7 @@ def main(page: ft.Page):
                         ft.IconButton(icon=ft.Icons.NEW_LABEL, icon_color=ft.Colors.WHITE, icon_size=30, on_click=None),
                         ft.Container(
                             content=text1,
-                            width=250,
+                            expand=True,
                         )
                     ],
                     alignment=ft.MainAxisAlignment.START,
@@ -623,7 +622,7 @@ def main(page: ft.Page):
                         ft.IconButton(icon=ft.Icons.NUMBERS, icon_color=ft.Colors.WHITE, icon_size=30, on_click=None),
                         ft.Container(
                             content=numbers_field,
-                            width=250,
+                            expand=True,
                         )
                     ],
                     alignment=ft.MainAxisAlignment.START,
@@ -634,7 +633,7 @@ def main(page: ft.Page):
                         ft.IconButton(icon=ft.Icons.SCALE, icon_color=ft.Colors.WHITE, icon_size=30, on_click=None),
                         ft.Container(
                             content=weight_field,
-                            width=250,
+                            expand=True,
                         )
                     ],
                     alignment=ft.MainAxisAlignment.START,
@@ -644,7 +643,7 @@ def main(page: ft.Page):
             spacing=25,
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
         ),
-        width=350,
+        #width=350,
         padding=20,
         border_radius=ft.border_radius.all(10),
         )
@@ -655,7 +654,6 @@ def main(page: ft.Page):
         content=ft.Column( # Nutze eine Column, um Titel, den Haupt-Content und die Aktionen zu stapeln
         [
             ft.Text("Wir brauchen:", color=(0xFFEAD9C9), size=30, weight=ft.FontWeight.BOLD),
-            #ft.Divider(height=10, color=ft.Colors.WHITE24), # Optional: Ein Trenner nach dem Titel
             dialog_content_container, 
             ft.Row( 
                 controls=[dialog_offer_button, dialog_add_button],
