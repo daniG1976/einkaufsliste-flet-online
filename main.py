@@ -117,6 +117,13 @@ def main(page: ft.Page):
         return
 
 
+    def alles_loeschen(e):
+        einkaufsliste_daten.clear()
+        page.run_task(update_einkaufsliste_ui) 
+        save_data()
+        page.update()
+        
+    
     def save_data():
         try:
             # Konvertiere die aktuelle Liste der ShoppingItem-Objekte in eine Liste von Dictionaries
@@ -350,66 +357,27 @@ def main(page: ft.Page):
 
     )
 
-    
-
-
-# --- Drag-and-Drop Logik START ---
-
-    # Korrektur: ft.DragTargetAcceptEvent durch ft.DragTargetEvent ersetzen
-
     def handle_drag_accept(e): 
 
-        # Das Element, das gezogen wurde (der Draggable)
-
         dragged_draggable = page.get_control(e.src_id)
-
-        
-
-        # Das Datenobjekt, das vom gezogenen Element stammt
-
         dragged_item_data = dragged_draggable.data 
-
-
-        # Das ShoppingItem-Objekt, das ZIEL des Drops ist
-
-        # Hier ist das DragTarget das Control, das das Dropping empfängt.
-
-        # e.control ist das DragTarget selbst.
-
-        target_item_data = e.control.data # DragTarget hat das ShoppingItem als data
-
-        
+        target_item_data = e.control.data # DragTarget hat das ShoppingItem als data        
 
         if dragged_item_data and target_item_data:
 
-            # Finde die Indexe der Elemente in der Datenliste
-
             try:
-
                 old_index = einkaufsliste_daten.index(dragged_item_data)
-
                 new_index = einkaufsliste_daten.index(target_item_data)
 
             except ValueError:
-
-                # Element nicht gefunden, sollte nicht passieren, aber zur Sicherheit
-
                 print("Fehler: Gezogenes oder Ziel-Element nicht in der Datenliste gefunden.")
-
                 return
 
-
-            # Entferne das gezogene Element aus seiner alten Position
-
             einkaufsliste_daten.pop(old_index)
-
-            # Füge es an der neuen Position ein
 
             einkaufsliste_daten.insert(new_index, dragged_item_data)
 
             save_data()
-
-            # Jetzt die ListView visuell neu rendern
 
             page.run_task(update_einkaufsliste_ui)
 
@@ -683,6 +651,7 @@ def main(page: ft.Page):
     
 
     gradient_dialog_container = ft.Container(
+        expand= True,
         content=ft.Column( # Nutze eine Column, um Titel, den Haupt-Content und die Aktionen zu stapeln
         [
             ft.Text("Wir brauchen:", color=(0xFFEAD9C9), size=30, weight=ft.FontWeight.BOLD),
@@ -745,8 +714,9 @@ def main(page: ft.Page):
                                     ft.Container(
                                         ft.PopupMenuButton(
                                             icon_color="#213745",
+                                            bgcolor= ft.Colors.TRANSPARENT,
                                             items=[
-                                                ft.PopupMenuItem(text="Einstellungen"),
+                                                ft.PopupMenuItem(text="Liste Löschen", on_click=alles_loeschen),
                                                 ft.PopupMenuItem(text="Über"),
                                             ]
                                         ),
