@@ -4,8 +4,8 @@ import os # Ebenfalls beibehalten, falls noch Referenzen existieren.
 import asyncio
 import firebase_admin # NEU: Für die Firebase-Verwaltung
 from firebase_admin import credentials, db # NEU: Für Authentifizierung und Datenbankzugriff
-import locale
-locale.setlocale(locale.LC_ALL, 'de_DE.UTF-8')
+#import locale
+#locale.setlocale(locale.LC_ALL, 'de_DE.UTF-8')
 
 class ShoppingItem:
     def __init__(self, name: str, amount: str, unit: str, is_offer: bool):
@@ -231,7 +231,8 @@ def main(page: ft.Page):
     new_item_name_input = ft.Ref[ft.TextField]() 
 
     def fab_clicked(e):
-        fruits.sort(key=locale.strxfrm)
+        fruits.sort()
+        #fruits.sort(key=locale.strxfrm)
     
         cupertino_picker_widget.controls = [
             ft.Text(fruit, text_align=ft.TextAlign.CENTER, color=ft.Colors.WHITE, size=18)
