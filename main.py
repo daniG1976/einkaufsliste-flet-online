@@ -4,7 +4,8 @@ import os # Ebenfalls beibehalten, falls noch Referenzen existieren.
 import asyncio
 import firebase_admin # NEU: Für die Firebase-Verwaltung
 from firebase_admin import credentials, db # NEU: Für Authentifizierung und Datenbankzugriff
-import threading
+import locale
+locale.setlocale(locale.LC_ALL, 'de_DE.UTF-8')
 
 class ShoppingItem:
     def __init__(self, name: str, amount: str, unit: str, is_offer: bool):
@@ -117,12 +118,19 @@ def main(page: ft.Page):
         page.update()
         return
 
-
     def alles_loeschen(e):
         einkaufsliste_daten.clear()
         page.run_task(update_einkaufsliste_ui) 
         save_data()
         page.update()
+        
+    def open_hitprospekt(e):
+        # Füge hier die URL zum aktuellen Prospekt ein
+        prospekt_url = "https://www.hit.de/maerkte/sankt-augustin/prospekte/wochenprospekt?seite=1"
+        
+        # Öffne die URL im Standard-Browser des Geräts
+        e.page.launch_url(prospekt_url)
+
         
     
     def save_data():
@@ -136,6 +144,7 @@ def main(page: ft.Page):
             print(f"Fehler beim Speichern der Daten in Firebase: {e}")
 
     def load_and_listen_data():
+        fruits.sort()
         try:
             def firebase_data_listener(event):
                 print(f"Firebase-Datenänderung erkannt: {event.event_type} at {event.path}")
@@ -222,8 +231,16 @@ def main(page: ft.Page):
     new_item_name_input = ft.Ref[ft.TextField]() 
 
     def fab_clicked(e):
-        page.open(dlg_modal) 
+        fruits.sort(key=locale.strxfrm)
+    
+        cupertino_picker_widget.controls = [
+            ft.Text(fruit, text_align=ft.TextAlign.CENTER, color=ft.Colors.WHITE, size=18)
+            for fruit in fruits
+        ]
 
+        page.open(dlg_modal)
+        page.update()
+        
         async def set_focus_on_dialog_input():
             await asyncio.sleep(0.1) 
             if new_item_name_input.current:
@@ -291,81 +308,47 @@ def main(page: ft.Page):
     fruits = [
         "Äpfel",
         "Bananen",
-
         "Milch",
-
         "Quark",
-
         "Wurst",
-
         "Käse",
-
         "Joghurt",
-
         "O-Saft",
-
         "Nudeln",
-
         "Nutella",
-
         "Kaffee"
-
     ]
 
 
-
     def handle_picker_change(e):
-
         selected_index = int(e.control.selected_index)
-
         if selected_index < len(fruits):
-
             selected_value = fruits[selected_index]
-
         else:
-
             selected_value = "N/A"
 
-
-        # HIER ist die entscheidende Prüfung
-
         if favoriten_anzeige.current: # Nur aktualisieren, wenn das Widget existiert
-
             favoriten_anzeige.current.value = selected_value
-
             favoriten_anzeige.current.update()
-
         page.update() # Dialog aktualisieren, damit Ref-Text sichtbar wird
 
-
     cupertino_picker_widget = ft.CupertinoPicker(
-
         selected_index=0,
-
         magnification=1.22,
-
         squeeze=1.2,
-
         use_magnifier=True,
-
         on_change=handle_picker_change,
-
         controls=[ft.Text(value=f, color="EAD9C9") for f in fruits],
-
         height=200,
-
-       item_extent=40,
-
+        item_extent=40,
     )
 
     def handle_drag_accept(e): 
-
         dragged_draggable = page.get_control(e.src_id)
         dragged_item_data = dragged_draggable.data 
         target_item_data = e.control.data # DragTarget hat das ShoppingItem als data        
 
         if dragged_item_data and target_item_data:
-
             try:
                 old_index = einkaufsliste_daten.index(dragged_item_data)
                 new_index = einkaufsliste_daten.index(target_item_data)
@@ -374,12 +357,9 @@ def main(page: ft.Page):
                 print("Fehler: Gezogenes oder Ziel-Element nicht in der Datenliste gefunden.")
                 return
 
-            einkaufsliste_daten.pop(old_index)
-
+            einkaufsliste_daten.pop(old_index)    
             einkaufsliste_daten.insert(new_index, dragged_item_data)
-
             save_data()
-
             page.run_task(update_einkaufsliste_ui)
 
 
@@ -641,7 +621,7 @@ def main(page: ft.Page):
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
             ],
-            scroll=True,
+            scroll="auto",
             spacing=25,
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
         ),
@@ -675,12 +655,9 @@ def main(page: ft.Page):
         bgcolor=ft.Colors.TRANSPARENT,
         content=gradient_dialog_container,
         shape=ft.RoundedRectangleBorder(radius=ft.border_radius.all(10)),
-        content_padding=ft.padding.only(left=18, right=18)
+        content_padding=ft.padding.only(left=12, right=12)
 
 )
-
-    #page.padding = 0
-    #page.spacing = 0
 
     page.add(
         ft.Stack(
@@ -718,6 +695,7 @@ def main(page: ft.Page):
                                             bgcolor= ft.Colors.TRANSPARENT,
                                             items=[
                                                 ft.PopupMenuItem(text="Liste Löschen", on_click=alles_loeschen),
+                                                ft.PopupMenuItem(text="HIT Angebote", on_click=open_hitprospekt),
                                                 ft.PopupMenuItem(text="Über"),
                                             ]
                                         ),
@@ -744,7 +722,7 @@ def main(page: ft.Page):
             expand=True,
         )
     )
-
+    
     page.update()
     load_and_listen_data()
 
