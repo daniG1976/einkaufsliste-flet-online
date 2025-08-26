@@ -125,12 +125,8 @@ def main(page: ft.Page):
         page.update()
         
     def open_hitprospekt(e):
-        # Füge hier die URL zum aktuellen Prospekt ein
-        #prospekt_url = "https://www.hit.de/maerkte/sankt-augustin/prospekte/wochenprospekt?seite=1"
-        # Öffne die URL im Standard-Browser des Geräts
-       # e.page.launch_url(prospekt_url)
-       e.page.go("/zweiteseite")
-
+    # Ändere diese Zeile
+        page.go("/zweiteseite")
         
     
     def save_data():
