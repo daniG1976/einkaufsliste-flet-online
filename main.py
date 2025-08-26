@@ -6,6 +6,7 @@ import firebase_admin # NEU: Für die Firebase-Verwaltung
 from firebase_admin import credentials, db # NEU: Für Authentifizierung und Datenbankzugriff
 #import locale
 #locale.setlocale(locale.LC_ALL, 'de_DE.UTF-8')
+from zweiteseite import zweiteseite_view
 
 class ShoppingItem:
     def __init__(self, name: str, amount: str, unit: str, is_offer: bool):
@@ -56,7 +57,6 @@ def main(page: ft.Page):
     #page.scroll = ft.ScrollMode.AUTO # Aktiviert Scrollen bei Bedarf, falls der Inhalt größer wird
     page.theme = ft.Theme(font_family="Roboto")
     #page.extend_body_behind_appbar = True 
-
 
     try:
         # Versuchen, die Umgebungsvariable zu lesen
@@ -117,7 +117,7 @@ def main(page: ft.Page):
         page.add(ft.Text(f"Fehler beim Starten der App: {error_msg}", color=ft.Colors.RED))
         page.update()
         return
-
+    
     def alles_loeschen(e):
         einkaufsliste_daten.clear()
         page.run_task(update_einkaufsliste_ui) 
@@ -126,10 +126,10 @@ def main(page: ft.Page):
         
     def open_hitprospekt(e):
         # Füge hier die URL zum aktuellen Prospekt ein
-        prospekt_url = "https://www.hit.de/maerkte/sankt-augustin/prospekte/wochenprospekt?seite=1"
-        
+        #prospekt_url = "https://www.hit.de/maerkte/sankt-augustin/prospekte/wochenprospekt?seite=1"
         # Öffne die URL im Standard-Browser des Geräts
-        e.page.launch_url(prospekt_url)
+       # e.page.launch_url(prospekt_url)
+       e.page.go("/zweiteseite")
 
         
     
@@ -250,18 +250,6 @@ def main(page: ft.Page):
             else:
                 print("Fehler: new_item_name_input.current ist nicht verfügbar nach Dialogöffnung.")
         page.run_task(set_focus_on_dialog_input)
-
-
-
-    page.floating_action_button = ft.FloatingActionButton(  
-            content=ft.Icon(name=ft.Icons.ADD, color="#EAD9C9"),
-            on_click=fab_clicked, # Funktion korrekt zugewiesen
-            bgcolor="#213745",
-            shape=ft.CircleBorder(),
-        )
-
-    page.floating_action_button_location = ft.FloatingActionButtonLocation.CENTER_FLOAT
-    page.update()
 
 
     favoriten_anzeige = ft.Ref[ft.Text]()
@@ -660,71 +648,94 @@ def main(page: ft.Page):
 
 )
 
-    page.add(
-        ft.Stack(
-            [
-                # Schicht 1: Der Hintergrund, der den ganzen Platz einnimmt
-                ft.Container(
-                    expand=True,
-                    gradient=ft.LinearGradient(
-                        begin=ft.alignment.top_center,
-                        end=ft.alignment.bottom_center,
-                        colors=["#EAD9C9", "#FF5B8E"],
-                    ),
-                ),
-                # Schicht 2: Der Hauptinhalt der App, der den ganzen Platz einnimmt
-                ft.Column(
+    def route_change(route):
+        page.views.clear()
+        
+        if page.route == "/":
+            main_view_controls = [
+                ft.Stack(
                     [
-                        # Header
                         ft.Container(
-                            content=ft.Row(
-                                [
-                                    ft.Container(width=50),
-                                    ft.Container(
-                                        expand=True,
-                                        content=ft.Text(
-                                            "Meine Einkaufsliste",
-                                            size=30,
-                                            weight=ft.FontWeight.BOLD,
-                                            color="#213745",
-                                            text_align=ft.TextAlign.CENTER,
-                                        ),
-                                    ),
-                                    ft.Container(
-                                        ft.PopupMenuButton(
-                                            icon_color="#213745",
-                                            bgcolor= ft.Colors.TRANSPARENT,
-                                            items=[
-                                                ft.PopupMenuItem(text="Liste Löschen", on_click=alles_loeschen),
-                                                ft.PopupMenuItem(text="HIT Angebote", on_click=open_hitprospekt),
-                                                ft.PopupMenuItem(text="Über"),
-                                            ]
-                                        ),
-                                        width=50,
-                                    ),
-                                ],
-                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                            ),
-                            padding=ft.padding.only(top=40, bottom=20),
-                            alignment=ft.alignment.center,
-                        ),
-                        # Liste der Elemente
-                        ft.ListView(
-                            ref=einkaufsliste_ref,
                             expand=True,
-                            spacing=10,
-                            padding=20,
+                            gradient=ft.LinearGradient(
+                                begin=ft.alignment.top_center,
+                                end=ft.alignment.bottom_center,
+                                colors=["#EAD9C9", "#FF5B8E"],
+                            ),
+                        ),
+                        ft.Column(
+                            [
+                                ft.Container(
+                                    content=ft.Row(
+                                        [
+                                            ft.Container(width=50),
+                                            ft.Container(
+                                                expand=True,
+                                                content=ft.Text(
+                                                    "Meine Einkaufsliste",
+                                                    size=30,
+                                                    weight=ft.FontWeight.BOLD,
+                                                    color="#213745",
+                                                    text_align=ft.TextAlign.CENTER,
+                                                ),
+                                            ),
+                                            ft.Container(
+                                                ft.PopupMenuButton(
+                                                    icon_color="#213745",
+                                                    bgcolor=ft.Colors.TRANSPARENT,
+                                                    items=[
+                                                        ft.PopupMenuItem(text="Liste Löschen", on_click=alles_loeschen),
+                                                        ft.PopupMenuItem(text="HIT Angebote", on_click=open_hitprospekt),
+                                                        ft.PopupMenuItem(text="Über"),
+                                                    ]
+                                                ),
+                                                width=50,
+                                            ),
+                                        ],
+                                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                                    ),
+                                    padding=ft.padding.only(top=40, bottom=20),
+                                    alignment=ft.alignment.center,
+                                ),
+                                ft.ListView(
+                                    ref=einkaufsliste_ref,
+                                    expand=True,
+                                    spacing=10,
+                                    padding=20,
+                                ),
+                            ],
+                            expand=True,
+                            alignment=ft.MainAxisAlignment.START,
                         ),
                     ],
                     expand=True,
-                    alignment=ft.MainAxisAlignment.START,
-                ),
-            ],
-            expand=True,
-        )
-    )
-    
+                )
+            ]
+            page.views.append(
+                ft.View(
+                    route="/", 
+                    controls=main_view_controls,
+                    floating_action_button=ft.FloatingActionButton(
+                        content=ft.Icon(name=ft.Icons.ADD, color="#EAD9C9"),
+                        on_click=fab_clicked,
+                        bgcolor="#213745",
+                        shape=ft.CircleBorder(),
+                    ),
+                    floating_action_button_location=ft.FloatingActionButtonLocation.CENTER_FLOAT
+                )
+            )
+            
+            load_and_listen_data()
+
+        elif page.route == "/zweiteseite":
+            page.views.append(zweiteseite_view(page))
+        
+        page.update()
+
+    page.on_route_change = route_change
+    page.go(page.route)
     page.update()
-    load_and_listen_data()
+
+
 
 ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=int(os.environ.get("PORT", 8550)), host="0.0.0.0")  
