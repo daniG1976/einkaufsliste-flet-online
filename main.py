@@ -681,7 +681,7 @@ def main(page: ft.Page):
                                                     bgcolor=ft.Colors.TRANSPARENT,
                                                     items=[
                                                         ft.PopupMenuItem(text="Liste Löschen", on_click=alles_loeschen),
-                                                        ft.PopupMenuItem(text="HIT Angebote", on_click=lambda e: open_hitprospekt(e)),
+                                                        ft.PopupMenuItem(text="HIT Angebote", on_click=lambda _: page.go("/zweiteseite")),
                                                         ft.PopupMenuItem(text="Über"),
                                                     ]
                                                 ),

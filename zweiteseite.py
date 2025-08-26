@@ -1,5 +1,5 @@
 import flet as ft
-import flet_webview as ftwv
+#import flet_webview as ftwv
 
 def zweiteseite_view(page: ft.Page):
     #prospekt_url = "https://www.hit.de/maerkte/sankt-augustin/prospekte/wochenprospekt?seite=1"
