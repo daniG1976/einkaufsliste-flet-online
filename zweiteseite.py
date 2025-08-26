@@ -10,7 +10,7 @@ def zweiteseite_view(page: ft.Page):
     )
     
     def on_back_click(e):
-        e.page.go("/")
+        page.go("/")
 
     # Gib die View mit dem vereinfachten Layout zurück
     return ft.View(
