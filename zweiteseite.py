@@ -1,13 +1,13 @@
 import flet as ft
-#import flet_webview as ftwv
+import flet_webview as ftwv
 
 def zweiteseite_view(page: ft.Page):
-    #prospekt_url = "https://www.hit.de/maerkte/sankt-augustin/prospekte/wochenprospekt?seite=1"
+    prospekt_url = "https://www.hit.de/maerkte/sankt-augustin/prospekte/wochenprospekt?seite=1"
 
-    #web_view_control = ftwv.WebView(
-        #url=prospekt_url,
-        #expand=True,
-    #)
+    web_view_control = ftwv.WebView(
+        url=prospekt_url,
+        expand=True,
+    )
     
     def on_back_click(e):
         page.go("/")
@@ -28,7 +28,7 @@ def zweiteseite_view(page: ft.Page):
                                 on_click=on_back_click
                             ),
                             ft.Text(
-                                "Aktueller Prospekt",
+                                "Aktueller HIT Prospekt",
                                 size=20,
                                 weight=ft.FontWeight.BOLD,
                                 color="#213745"
@@ -37,7 +37,7 @@ def zweiteseite_view(page: ft.Page):
                         alignment=ft.MainAxisAlignment.START,
                     ),
                     #ft.Divider(),
-                    #web_view_control,
+                    web_view_control,
                 ],
                 expand=True,
             )
