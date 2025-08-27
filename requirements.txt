@@ -18,6 +18,7 @@ firebase-admin==6.9.0
 flet==0.28.3
 flet-core==0.23.0
 flet-runtime==0.23.0
+flet-webview
 git-filter-repo==2.47.0
 google-api-core==2.25.1
 google-api-python-client==2.175.0

@@ -658,6 +658,9 @@ def main(page: ft.Page):
                                 end=ft.alignment.bottom_center,
                                 colors=["#EAD9C9", "#FF5B8E"],
                             ),
+                            padding=0,
+                            margin=0,
+                            border=ft.border.all(0, ft.Colors.TRANSPARENT),
                         ),
                         ft.Column(
                             [
@@ -711,6 +714,7 @@ def main(page: ft.Page):
                 ft.View(
                     route="/", 
                     controls=main_view_controls,
+                    padding=0, 
                     floating_action_button=ft.FloatingActionButton(
                         content=ft.Icon(name=ft.Icons.ADD, color="#EAD9C9"),
                         on_click=fab_clicked,
