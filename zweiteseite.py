@@ -12,34 +12,47 @@ def zweiteseite_view(page: ft.Page):
     def on_back_click(e):
         page.go("/")
 
-    # Gib die View mit dem vereinfachten Layout zurück
     return ft.View(
         route="/zweiteseite",
-        # Setze eine Hintergrundfarbe, um den Stil beizubehalten
-        bgcolor=ft.Colors.with_opacity(0.6, "#FF5B8E"), 
+        # Setze einen transparenten Hintergrund für die View
+        bgcolor="#FF5B8E",
+        padding=0,
         controls=[
-            ft.Column(
-                [
-                    ft.Row(
-                        [
-                            ft.IconButton(
-                                icon=ft.Icons.ARROW_BACK,
-                                icon_color="#213745",
-                                on_click=on_back_click
-                            ),
-                            ft.Text(
-                                "Aktueller HIT Prospekt",
-                                size=20,
-                                weight=ft.FontWeight.BOLD,
-                                color="#213745"
-                            )
-                        ],
-                        alignment=ft.MainAxisAlignment.START,
-                    ),
-                    #ft.Divider(),
-                    web_view_control,
-                ],
+            # Der Haupt-Container, der die gesamte Seite umhüllt
+            ft.Container(
                 expand=True,
+                margin=ft.margin.all(10),  # Abstand von den Rändern des Bildschirms
+                padding=ft.padding.all(15), # Innerer Abstand für den Inhalt
+                gradient=ft.LinearGradient(
+                                begin=ft.alignment.top_center,
+                                end=ft.alignment.bottom_center,
+                                colors=["#EAD9C9", "#FF5B8E"],
+                            ),
+                border_radius=ft.border_radius.all(14),
+                content=ft.Column(
+                    expand=True,
+                    controls=[
+                        # Die AppBar ist jetzt Teil des Containers
+                        ft.Row(
+                            [
+                                ft.IconButton(
+                                    icon=ft.Icons.ARROW_BACK,
+                                    icon_color="#213745",
+                                    on_click=on_back_click
+                                ),
+                                ft.Text(
+                                    "Aktueller HIT Prospekt",
+                                    size=20,
+                                    weight=ft.FontWeight.BOLD,
+                                    color="#213745"
+                                )
+                            ],
+                            alignment=ft.MainAxisAlignment.START,
+                        ),
+                        # Der WebView befindet sich jetzt in der Spalte des Containers
+                        web_view_control
+                    ]
+                )
             )
         ]
     )

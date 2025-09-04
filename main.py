@@ -349,12 +349,18 @@ def main(page: ft.Page):
 
 
     async def update_einkaufsliste_ui():
-        if einkaufsliste_ref.current:
+        if einkaufsliste_ref.current is not None:
+            # Lösche die alten Steuerelemente
             einkaufsliste_ref.current.controls.clear()
+
+            # Füge die neuen Steuerelemente hinzu
             for item in einkaufsliste_daten:
                 einkaufsliste_ref.current.controls.append(create_shopping_card(item))
-            einkaufsliste_ref.current.update() 
+                
+            # Aktualisiere die ListView und die Seite
+            einkaufsliste_ref.current.update()
             page.update()
+
 
     def add_favorite(e):
         if favoriten_anzeige.current and favoriten_anzeige.current.value:
@@ -611,6 +617,7 @@ def main(page: ft.Page):
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
         ),
         width=350,
+        height=500,
         padding=20,
         border_radius=ft.border_radius.all(10),
         )
@@ -637,12 +644,15 @@ def main(page: ft.Page):
 
 
     dlg_modal = ft.AlertDialog(
+        #modal= True,
         bgcolor=ft.Colors.TRANSPARENT,
         content=gradient_dialog_container,
+        scrollable=True,
         shape=ft.RoundedRectangleBorder(radius=ft.border_radius.all(10)),
-        content_padding=ft.padding.only(left=12, right=12)
+        #content_padding=ft.padding.only(left=12, right=12)
+        content_padding=ft.padding.all(10),
 
-)
+        )
 
     def route_change(route):
         page.views.clear()
