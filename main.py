@@ -23,6 +23,8 @@ favoriten_dialog_state = {
     "fruits": []             # Liste der Favoriten
 }
 
+selected_category_index = 0 
+
 
 class ShoppingItem:
 
@@ -542,14 +544,41 @@ def main(page: ft.Page):
 
     cupertino_picker_widget = ft.CupertinoPicker(
         selected_index=0,
-        magnification=1.22,
-        squeeze=1.2,
-        use_magnifier=True,
+        magnification=1.15,  # Weniger Zoom
+        squeeze=1.1,         # Etwas enger
+        #use_magnifier=True,
         on_change=handle_picker_change,
-        controls=[ft.Text(value=f, color="EAD9C9") for f in favoriten_dialog_state["fruits"]],
-        height=200,
-        item_extent=40,
+        controls=[ft.Text(size=16, value=f, color="EAD9C9") for f in favoriten_dialog_state["fruits"]],
+        height=150,          # Kleiner als vorher (200)
+        item_extent=32,      # Weniger Platz pro Eintrag
     )
+    
+    Kategorien = [
+        "Obst&Gemüse",
+        "Milchprodukte",
+        "Fleisch&Wurst",
+        "Sonstiges",
+        "Tiefkühl",
+        "Vorräte"
+    ]
+    
+    def handle_category_change(e):
+        global selected_category_index
+        selected_category_index = e.control.selected_index
+        print(f"Kategorie ausgewählt: {Kategorien[selected_category_index]}")
+    
+    cupertino_picker_widget2 = ft.CupertinoPicker(
+        selected_index=0,
+        magnification=1.15,  
+        squeeze=1.1,         
+        use_magnifier=True,
+        on_change= handle_category_change,
+        controls=[ft.Text(size=16, value=f, color="EAD9C9") for f in Kategorien],
+        height=150,          # Kleiner als vorher (200)
+        item_extent=32,      # Weniger Platz pro Eintrag
+    )
+
+
     
     cupertino_picker_widget.on_change = handle_picker_change
 
@@ -872,45 +901,21 @@ def main(page: ft.Page):
         colors=[
 
             "#213745",
-
             #"EAD9C9", # Startfarbe des Dialog-Gradients
-
             "#FF5B8E", # Endfarbe des Dialog-Gradients
-
         ],
-
     )
 
-
-   
-
     dialog_content_container = ft.Container(
-
         content=ft.Column(
-
             controls=[
-
-                ft.Text(
-
-                ref=favoriten_anzeige, # Behalte die Referenz, aber mache den Text unsichtbar
-
-                value="", # Setze den Wert auf einen leeren String
-
-                visible=False, # Der entscheidende Schritt: Das Widget ist nicht sichtbar
-
-                ),
-
                 ft.Row(
-
-                    controls=[
-                        
+                    controls=[                        
                         ft.IconButton(icon=ft.Icons.DELETE_FOREVER, icon_color=ft.Colors.WHITE, icon_size=30, on_click=favorit_loeschen),
-                        #ft.IconButton(icon=ft.Icons.ADD, icon_color=ft.Colors.WHITE, icon_size=30, on_click=add_favorite),
                         ft.Container(
                             content=cupertino_picker_widget,
                             expand=True,
                         ),
-
                     ],
                     alignment=ft.MainAxisAlignment.START,
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -938,44 +943,38 @@ def main(page: ft.Page):
                     ],
                     alignment=ft.MainAxisAlignment.START,
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
-
                 ),
-
                 ft.Row(
                     controls=[
-
                         ft.IconButton(icon=ft.Icons.SCALE, icon_color=ft.Colors.WHITE, icon_size=30, on_click=None),
                         ft.Container(
                             content=weight_field,
                             expand=True,
                         )
-
                     ],
-
                     alignment=ft.MainAxisAlignment.START,
-
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
-
                 ),
-
+                ft.Row(
+                    controls=[                        
+                        ft.IconButton(icon=ft.Icons.CATEGORY, icon_color=ft.Colors.WHITE, icon_size=30, on_click=None),
+                        ft.Container(
+                            content=cupertino_picker_widget2,
+                            expand=True,
+                        ),
+                    ],
+                    alignment=ft.MainAxisAlignment.START,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                ),
             ],
-
             scroll="auto",
-
             spacing=25,
-
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-
         ),
-
         width=350,
-
-        height=500,
-
+        height=600,
         padding=20,
-
         border_radius=ft.border_radius.all(10),
-
         )
 
    
