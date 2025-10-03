@@ -15,9 +15,15 @@ from google.cloud import speech
 from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
 
+import platform
 
+if platform.system() in ["Windows", "Linux", "Darwin"]:
+    try:
+        import sounddevice as sd
+    except ImportError:
+        sd = None
+        print("sounddevice nicht verfügbar, lokale Aufnahme deaktiviert.")
 
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "einkaufsliste-stt-b14b1464c759.json"
 
 # FastAPI-App für Web-Audio
 web_app = FastAPI()
@@ -922,14 +928,15 @@ def main(page: ft.Page):
     
 
     def speech_button_clicked(e):
-        if platform.system() in ["Windows", "Linux", "Darwin"]:  # Desktop
+        if platform.system() in ["Windows", "Linux", "Darwin"] and sd is not None:
             audio = record_audio(duration=3)
             text = speech_to_text(audio)
             if text:
                 text1.value = text
                 page.update()
-        else:  # Web (iPhone / Browser)
+        else:
             asyncio.create_task(start_browser_recording(page, text1))
+
 
 
     speech_add_button = ft.IconButton(

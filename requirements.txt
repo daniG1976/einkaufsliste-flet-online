@@ -26,6 +26,7 @@ google-auth==2.40.3
 google-auth-httplib2==0.2.0
 google-cloud-core==2.4.3
 google-cloud-firestore==2.21.0
+google-cloud-speech
 google-cloud-storage==3.1.1
 google-crc32c==1.7.1
 google-resumable-media==2.7.2
@@ -70,6 +71,7 @@ rich==14.0.0
 rsa==4.9.1
 six==1.17.0
 sniffio==1.3.1
+sounddevice
 starlette==0.46.2
 text-unidecode==1.3
 toml==0.10.2
