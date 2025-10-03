@@ -1,3 +1,6 @@
 .venv/
 .venv_wsl/
 firebase_credentials.json
+einkaufsliste-stt-*.json
+*.key.json
+*.service.json
