@@ -11,8 +11,19 @@ import base64
 from fastapi import FastAPI
 import asyncio
 from google.cloud import speech
+from google.oauth2 import service_account
 from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
+
+creds_json = os.getenv("GOOGLE_CLOUD_CREDENTIALS_JSON")
+
+if creds_json:
+    creds_dict = json.loads(creds_json)
+    creds = service_account.Credentials.from_service_account_info(creds_dict)
+    speech_client = speech.SpeechClient(credentials=creds)
+else:
+    # Fallback: lokal versucht er Standard-Credentials zu nehmen
+    speech_client = speech.SpeechClient()
 
 
 # FastAPI-App für Web-Audio
@@ -23,8 +34,6 @@ web_app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-speech_client = speech.SpeechClient()
 
 @web_app.post("/upload_audio")
 async def upload_audio(payload: dict):
