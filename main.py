@@ -10,20 +10,9 @@ import platform
 import base64
 from fastapi import FastAPI
 import asyncio
-import sounddevice as sd
 from google.cloud import speech
 from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
-
-
-if platform.system() in ["Windows", "Linux", "Darwin"]:
-    try:
-        import sounddevice as sd
-    except ImportError:
-        sd = None
-        print("sounddevice nicht verfügbar, lokale Aufnahme deaktiviert.")
-else:
-    sd = None
 
 
 # FastAPI-App für Web-Audio
@@ -67,13 +56,6 @@ favoriten_dialog_state = {
 }
 
 selected_category_index = 0 
-
-def record_audio(duration=3, fs=16000):
-    print("Aufnahme startet...")
-    audio = sd.rec(int(duration * fs), samplerate=fs, channels=1, dtype='int16')
-    sd.wait()
-    print("Aufnahme beendet.")
-    return audio.flatten().tobytes()
 
 
 def speech_to_text(audio_bytes, encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16, sample_rate_hertz=16000):
@@ -927,18 +909,30 @@ def main(page: ft.Page):
 
     dialog_add_button = ft.IconButton(icon=ft.Icons.ADD, icon_color=ft.Colors.WHITE, icon_size=30, on_click=dialog_add_clicked)
     
+    def record_audio(duration=3, fs=16000):
+        try:
+            import sounddevice as sd
+        except ImportError:
+            print("sounddevice nicht verfügbar, lokale Aufnahme deaktiviert.")
+            return b""  # Leerer Byte-String, falls nicht verfügbar
+
+        print("Aufnahme startet...")
+        audio = sd.rec(int(duration * fs), samplerate=fs, channels=1, dtype='int16')
+        sd.wait()
+        print("Aufnahme beendet.")
+        return audio.flatten().tobytes()
+
 
     def speech_button_clicked(e):
-        if sd is not None:
+        if platform.system() in ["Windows", "Linux", "Darwin"]:  # Desktop
             audio = record_audio(duration=3)
-            text = speech_to_text(audio)
-            if text:
-                text1.value = text
-                page.update()
-        else:
+            if audio:  # nur wenn Aufnahme erfolgreich war
+                text = speech_to_text(audio)
+                if text:
+                    text1.value = text
+                    page.update()
+        else:  # Web (iPhone / Browser)
             asyncio.create_task(start_browser_recording(page, text1))
-
-
 
 
     speech_add_button = ft.IconButton(
@@ -947,6 +941,7 @@ def main(page: ft.Page):
         icon_size=30,
         on_click=speech_button_clicked
     )
+
 
 
     dialog_gradient = ft.LinearGradient(
