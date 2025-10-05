@@ -974,19 +974,33 @@ def main(page: ft.Page):
             page.update()
 
 
-    def speech_button_clicked(e):
-        if platform.system() in ["Windows", "Linux", "Darwin"]:  # Desktop
+    async def speech_button_clicked(e):
+
+        # WICHTIG: Den 'async' Aufruf direkt in den Klick-Handler legen
+        # (Nur der Web-Teil wird ausgeführt, wenn Flet als Web-App läuft)
+        
+        # 1. Plattform-Prüfung
+        if platform.system() in ["Windows", "Linux", "Darwin"]:  # Desktop (Windows, Linux, macOS)
+            print("Desktop-Spracherkennung gestartet.")
+            # Bei Desktop/lokalem Start wird die Audioaufnahme synchron ausgeführt.
+            # Keine Notwendigkeit für das Web-JS-Skript.
             try:
+                # Hier müsste Ihre bestehende synchrone Logik stehen
                 audio = record_audio(duration=3)
                 if audio:
                     text = speech_to_text(audio)
-                    if text:
-                        text1.value = text
-                        page.update()
+                    if text and new_item_name_input.current:
+                        new_item_name_input.current.value = text
+                        new_item_name_input.current.update()
             except Exception as ex:
-                print("Desktop Speech Error:", ex)
-        else:  # Web / iPhone
-            asyncio.create_task(start_browser_recording(page))
+                print(f"Desktop Speech Error: {ex}")
+                # Optional: Feedback im Dialog anzeigen, falls lokal ein Fehler auftritt
+                
+        else:  # Web / iOS / Android (nutzt den Browser-Kontext)
+            print("Web-Spracherkennung (via JavaScript) gestartet.")
+            # Führt die asynchrone JS-Aufnahme direkt aus.
+            # Dies hält die notwendige Verbindung zum Benutzer-Klick-Event aufrecht.
+            await start_browser_recording(e.page) # Wichtig: 'e.page' an die Funktion übergeben
 
 
 
