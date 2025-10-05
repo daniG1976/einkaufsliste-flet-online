@@ -951,27 +951,35 @@ def main(page: ft.Page):
     async def handle_speech_result(e):
         data = e.data
         if isinstance(data, dict):
-            if data.get("type") == "speech_result":
-                text1.value = data.get("text", "")
+            msg_type = data.get("type")
+            text = data.get("text", "")
+            if msg_type == "speech_result":
+                text1.value = text
                 page.update()
-            elif data.get("type") == "speech_error":
-                text1.value = f"Fehler: {data.get('text')}"
-                page.update()
-            elif data.get("type") == "speech_status":
-                text1.value = f"Status: {data.get('text')}"
-                page.update()
+            elif msg_type == "speech_error":
+                print("Speech Error:", text)
+            elif msg_type == "speech_status":
+                print("Speech Status:", text)
+
 
     # --- Button-Callback Sprachaufnahme ---
     def speech_button_clicked(e):
-        if platform.system() in ["Windows", "Linux", "Darwin"]:
-            audio = record_audio(duration=3)
-            if audio:
-                text = speech_to_text(audio)
-                if text:
-                    text1.value = text
-                    page.update()
+        if platform.system() in ["Windows", "Linux", "Darwin"]:  # Desktop
+            try:
+                audio = record_audio(duration=3)
+                if audio:
+                    text = speech_to_text(audio)
+                    if text:
+                        text1.value = text
+                        page.update()
+            except Exception as ex:
+                print("Desktop Speech Error:", ex)
         else:  # Web / iPhone
-            asyncio.create_task(start_browser_recording(page))
+            try:
+                asyncio.create_task(start_browser_recording(page))
+            except Exception as ex:
+                print("Browser Speech Error:", ex)
+
 
 
     # --- IconButton im Dialog ---
