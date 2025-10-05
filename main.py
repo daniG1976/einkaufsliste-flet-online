@@ -86,18 +86,18 @@ def speech_to_text(audio_bytes, encoding=speech.RecognitionConfig.AudioEncoding.
 
 
 
-async def start_browser_recording(page: ft.Page, textfield: ft.TextField):
+# --- Funktion für Browser-Aufnahme (iPhone/Web) ---
+async def start_browser_recording(page: ft.Page):
     js_code = """
-    (async function(){
+    (async () => {
         try {
-            alert("🎯 Starte Mikrofon...");
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            alert("🎙️ Zugriff erlaubt!");
             const mediaRecorder = new MediaRecorder(stream);
             let chunks = [];
+
             mediaRecorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+
             mediaRecorder.onstop = async () => {
-                alert("⏹️ Aufnahme beendet – sende an Server...");
                 const blob = new Blob(chunks, { type: "audio/webm" });
                 const reader = new FileReader();
                 reader.onloadend = async () => {
@@ -108,18 +108,24 @@ async def start_browser_recording(page: ft.Page, textfield: ft.TextField):
                         body: JSON.stringify({ audio: base64data })
                     });
                     const result = await response.json();
-                    alert("Text erkannt: " + (result.text || "— nichts erkannt —"));
+                    const recognized = result.text || "";
+                    // Ergebnis an Flet zurückgeben
+                    window.parent.postMessage({ type: "speech_result", text: recognized }, "*");
                 };
                 reader.readAsDataURL(blob);
             };
+
             mediaRecorder.start();
-            setTimeout(()=>mediaRecorder.stop(), 3000);
-        } catch(err){
-            alert("Fehler: " + err.message);
+            setTimeout(() => mediaRecorder.stop(), 3000);
+        } catch (err) {
+            window.parent.postMessage({ type: "speech_error", message: err.message }, "*");
         }
     })();
     """.replace("\n", "")
-    page.launch_url(f"javascript:{js_code}")
+    
+    # JS ausführen ohne neue Seite
+    page.window_run_js(js_code)
+
 
 
 class ShoppingItem:
@@ -931,17 +937,32 @@ def main(page: ft.Page):
         return audio.flatten().tobytes()
 
 
+    # --- Callback für Browser-Messages ---
+    async def handle_speech_result(e):
+        data = e.data
+        if isinstance(data, dict) and data.get("type") == "speech_result":
+            recognized_text = data.get("text", "")
+            text1.value = recognized_text
+            page.update()
+        elif isinstance(data, dict) and data.get("type") == "speech_error":
+            print("Speech error:", data.get("message"))
+
+
+    # --- Button-Callback für Sprachaufnahme ---
     def speech_button_clicked(e):
         if platform.system() in ["Windows", "Linux", "Darwin"]:  # Desktop
-            audio = record_audio(duration=3)
-            if audio:  # nur wenn Aufnahme erfolgreich war
+            audio = record_audio(duration=3)  # lokale Aufnahme
+            if audio:
                 text = speech_to_text(audio)
                 if text:
                     text1.value = text
                     page.update()
-        else:  # Web (iPhone / Browser)
-            asyncio.create_task(start_browser_recording(page, text1))
+        else:  # Web / iPhone
+            asyncio.create_task(start_browser_recording(page))
 
+
+    # --- Verbindung zu Flet herstellen ---
+    page.on_message = handle_speech_result
 
     speech_add_button = ft.IconButton(
         icon=ft.Icons.MIC,
