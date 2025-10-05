@@ -85,6 +85,8 @@ def speech_to_text(audio_bytes, encoding=speech.RecognitionConfig.AudioEncoding.
     return ""
 
 
+# Status-Textfeld (direkt im Dialog)
+
 
 # --- Browser / iPhone Sprachaufnahme ---
 async def start_browser_recording(page: ft.Page):
@@ -93,7 +95,6 @@ async def start_browser_recording(page: ft.Page):
         const sendMessage = (type, message) => {{
             window.parent.postMessage({{ type: type, text: message }}, "*");
         }};
-
         try {{
             sendMessage("speech_status", "Versuche Zugriff auf Mikrofon...");
             const stream = await navigator.mediaDevices.getUserMedia({{ audio: true }});
@@ -101,7 +102,6 @@ async def start_browser_recording(page: ft.Page):
 
             const mediaRecorder = new MediaRecorder(stream);
             let chunks = [];
-
             mediaRecorder.ondataavailable = e => {{ if (e.data.size > 0) chunks.push(e.data); }};
             mediaRecorder.onstop = async () => {{
                 sendMessage("speech_status", "Aufnahme beendet, verarbeite Audio...");
@@ -125,11 +125,11 @@ async def start_browser_recording(page: ft.Page):
                 }};
                 reader.readAsDataURL(blob);
             }};
-
             mediaRecorder.start();
             setTimeout(() => mediaRecorder.stop(), 3000);
         }} catch (err) {{
-            sendMessage("speech_error", "Mikrofonzugriff fehlgeschlagen: " + err.message);
+            let errorMessage = err.name + ": " + err.message; // <-- NEU
+            sendMessage("speech_error", "Mikrofonzugriff fehlgeschlagen: " + errorMessage); // <-- NEU
         }}
     }})();
     """.replace("\n", "")
@@ -947,22 +947,33 @@ def main(page: ft.Page):
         return audio.flatten().tobytes()
 
 
-    # --- Callback für Browser / Desktop Messages ---
     async def handle_speech_result(e):
-        data = e.data
-        if isinstance(data, dict):
-            msg_type = data.get("type")
-            text = data.get("text", "")
-            if msg_type == "speech_result":
-                text1.value = text
-                page.update()
+        data = json.loads(e.data) # Flet gibt e.data als JSON-String zurück
+        msg_type = data.get("type")
+        text = data.get("text", "")
+
+        if speech_status_text:
+            # Status-Updates direkt im Text-Element anzeigen
+            if msg_type == "speech_status":
+                speech_status_text.value = f"Status: {text}"
+                speech_status_text.color = ft.Colors.WHITE 
+            
+            # Fehlermeldung anzeigen
             elif msg_type == "speech_error":
-                print("Speech Error:", text)
-            elif msg_type == "speech_status":
-                print("Speech Status:", text)
+                speech_status_text.value = f"❌ FEHLER: {text}"
+                speech_status_text.color = ft.Colors.RED # Rote Farbe für Fehler
+            
+            # Erfolgreiches Ergebnis
+            elif msg_type == "speech_result":
+                speech_status_text.value = "Spracherkennung erfolgreich."
+                speech_status_text.color = ft.Colors.GREEN_400
+                text1.value = text # Den erkannten Text in das Eingabefeld setzen
+            
+            # Wichtig: UI aktualisieren
+            speech_status_text.update()
+            page.update()
 
 
-    # --- Button-Callback Sprachaufnahme ---
     def speech_button_clicked(e):
         if platform.system() in ["Windows", "Linux", "Darwin"]:  # Desktop
             try:
@@ -975,10 +986,8 @@ def main(page: ft.Page):
             except Exception as ex:
                 print("Desktop Speech Error:", ex)
         else:  # Web / iPhone
-            try:
-                asyncio.create_task(start_browser_recording(page))
-            except Exception as ex:
-                print("Browser Speech Error:", ex)
+            asyncio.create_task(start_browser_recording(page))
+
 
 
 
@@ -992,7 +1001,14 @@ def main(page: ft.Page):
 
     # --- Flet Page auf Nachrichten vorbereiten ---
     page.on_message = handle_speech_result
+    
 
+    speech_status_text = ft.Text(
+        value="Bereit.", 
+        color=ft.Colors.WHITE, 
+        size=14, 
+        text_align=ft.TextAlign.CENTER
+    )
 
     dialog_gradient = ft.LinearGradient(
 
@@ -1011,6 +1027,7 @@ def main(page: ft.Page):
     dialog_content_container = ft.Container(
         content=ft.Column(
             controls=[
+                speech_status_text,
                 ft.Row(
                     controls=[                        
                         ft.IconButton(icon=ft.Icons.DELETE_FOREVER, icon_color=ft.Colors.WHITE, icon_size=30, on_click=favorit_loeschen),
@@ -1079,7 +1096,7 @@ def main(page: ft.Page):
         border_radius=ft.border_radius.all(10),
         )
 
-   
+
 
 
     gradient_dialog_container = ft.Container(
@@ -1101,7 +1118,6 @@ def main(page: ft.Page):
     border_radius=ft.border_radius.all(10), # Abgerundete Ecken für den Dialog
 
 )
-
 
 
     dlg_modal = ft.AlertDialog(
