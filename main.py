@@ -1,32 +1,37 @@
 import flet as ft
-import json # Behalten wir für den Moment, falls noch Referenzen existieren, kann aber später entfernt werden.
-import os # Ebenfalls beibehalten, falls noch Referenzen existieren.
+import json
+import os
 import asyncio
-import firebase_admin # NEU: Für die Firebase-Verwaltung
-from firebase_admin import credentials, db # NEU: Für Authentifizierung und Datenbankzugriff
+import firebase_admin
+from firebase_admin import credentials, db
 from zweiteseite import zweiteseite_view
 import uuid
 import platform
 import base64
-from fastapi import FastAPI
-import asyncio
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from google.cloud import speech
 from google.oauth2 import service_account
-from fastapi import Request
-from fastapi.middleware.cors import CORSMiddleware
+import tempfile
 
-creds_json = os.getenv("GOOGLE_CLOUD_CREDENTIALS_JSON")
-
-if creds_json:
+# 🔐 --- GOOGLE SPEECH CREDENTIALS ---
+# Render: holt die JSON aus der Environment Variable
+# Lokal: nutzt deine .json-Datei im Projektverzeichnis
+if os.getenv("GOOGLE_CLOUD_CREDENTIALS_JSON"):
+    creds_json = os.getenv("GOOGLE_CLOUD_CREDENTIALS_JSON")
     creds_dict = json.loads(creds_json)
     creds = service_account.Credentials.from_service_account_info(creds_dict)
     speech_client = speech.SpeechClient(credentials=creds)
 else:
-    # Fallback: lokal versucht er Standard-Credentials zu nehmen
-    speech_client = speech.SpeechClient()
+    # Lokal: suche nach JSON-Datei im Projektordner
+    local_path = os.path.join(os.path.dirname(__file__), "einkaufsliste-stt-b14b1464c759.json")
+    if os.path.exists(local_path):
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = local_path
+        speech_client = speech.SpeechClient()
+    else:
+        raise FileNotFoundError("❌ Keine Google-Credentials gefunden! Bitte JSON-Datei hinzufügen oder Environment Variable setzen.")
 
-
-# FastAPI-App für Web-Audio
+# --- FastAPI-App für Web-Audio ---
 web_app = FastAPI()
 web_app.add_middleware(
     CORSMiddleware,
@@ -50,13 +55,12 @@ async def upload_audio(payload: dict):
         return {"text": text}
     except Exception as e:
         return {"error": str(e)}
-    
+
 @web_app.get("/set_text")
 async def set_text(request: Request):
     text = request.query_params.get("text", "")
-    # Achtung: text1 und page sind innerhalb von main() definiert, daher können wir sie hier nicht direkt nutzen.
-    # Wir müssen diese Funktion stattdessen über eine Brücke oder Callback an main() weitergeben.
     return {"status": "ok"}
+
 
 
 favoriten_dialog_state = {
@@ -86,25 +90,40 @@ async def start_browser_recording(page: ft.Page, textfield: ft.TextField):
     js_code = """
     async function recordAudio() {
         try {
+            console.log("🎯 Starte Mikrofonanfrage...");
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            console.log("🎙️ Mikrofonzugriff OK, starte Aufnahme...");
+            alert("Aufnahme startet...");
+
             const mediaRecorder = new MediaRecorder(stream);
             let chunks = [];
 
-            mediaRecorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+            mediaRecorder.ondataavailable = e => { 
+                if (e.data.size > 0) chunks.push(e.data); 
+            };
 
             mediaRecorder.onstop = async () => {
+                console.log("🛑 Aufnahme beendet, sende Daten...");
                 const blob = new Blob(chunks, { type: "audio/webm" });
                 const reader = new FileReader();
                 reader.onloadend = async () => {
                     const base64data = reader.result.split(",")[1];
-                    const response = await fetch("/upload_audio", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ audio: base64data })
-                    });
-                    const result = await response.json();
-                    // Flet-Feld in Python updaten
-                    fetch(`/set_text?text=${encodeURIComponent(result.text)}`);
+                    try {
+                        const response = await fetch("https://meine-einkaufsliste.onrender.com/upload_audio", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ audio: base64data })
+                        });
+                        const result = await response.json();
+                        console.log("✅ Antwort vom Server:", result);
+                        alert("Text erkannt: " + (result.text || "— keine Sprache erkannt —"));
+                        if (result.text) {
+                            fetch(`/set_text?text=${encodeURIComponent(result.text)}`);
+                        }
+                    } catch (err) {
+                        console.error("❌ Fehler beim Upload:", err);
+                        alert("Fehler beim Upload: " + err.message);
+                    }
                 };
                 reader.readAsDataURL(blob);
             };
@@ -112,12 +131,14 @@ async def start_browser_recording(page: ft.Page, textfield: ft.TextField):
             mediaRecorder.start();
             setTimeout(() => mediaRecorder.stop(), 3000);
         } catch (err) {
-            console.error("Fehler beim Zugriff auf Mikro:", err);
+            console.error("❌ Mikrofonfehler:", err);
+            alert("Mikrofonfehler: " + err.message);
         }
     }
     recordAudio();
     """
     page.window_run_js(js_code)
+
 
 
 
