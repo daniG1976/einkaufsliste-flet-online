@@ -86,7 +86,7 @@ def speech_to_text(audio_bytes, encoding=speech.RecognitionConfig.AudioEncoding.
 
 
 
-# --- Funktion für Browser-Aufnahme (iPhone/Web) ---
+# --- Browser / iPhone Sprachaufnahme ---
 async def start_browser_recording(page: ft.Page):
     js_code = """
     (async () => {
@@ -109,7 +109,6 @@ async def start_browser_recording(page: ft.Page):
                     });
                     const result = await response.json();
                     const recognized = result.text || "";
-                    // Ergebnis an Flet zurückgeben
                     window.parent.postMessage({ type: "speech_result", text: recognized }, "*");
                 };
                 reader.readAsDataURL(blob);
@@ -122,9 +121,8 @@ async def start_browser_recording(page: ft.Page):
         }
     })();
     """.replace("\n", "")
-    
-    # JS ausführen ohne neue Seite
-    page.window_run_js(js_code)
+
+    await page.eval_js(js_code)
 
 
 
@@ -937,7 +935,7 @@ def main(page: ft.Page):
         return audio.flatten().tobytes()
 
 
-    # --- Callback für Browser-Messages ---
+    # --- Callback für Browser / Desktop Messages ---
     async def handle_speech_result(e):
         data = e.data
         if isinstance(data, dict) and data.get("type") == "speech_result":
@@ -948,10 +946,10 @@ def main(page: ft.Page):
             print("Speech error:", data.get("message"))
 
 
-    # --- Button-Callback für Sprachaufnahme ---
+    # --- Button-Callback Sprachaufnahme ---
     def speech_button_clicked(e):
         if platform.system() in ["Windows", "Linux", "Darwin"]:  # Desktop
-            audio = record_audio(duration=3)  # lokale Aufnahme
+            audio = record_audio(duration=3)
             if audio:
                 text = speech_to_text(audio)
                 if text:
@@ -961,9 +959,7 @@ def main(page: ft.Page):
             asyncio.create_task(start_browser_recording(page))
 
 
-    # --- Verbindung zu Flet herstellen ---
-    page.on_message = handle_speech_result
-
+    # --- IconButton im Dialog ---
     speech_add_button = ft.IconButton(
         icon=ft.Icons.MIC,
         icon_color=ft.Colors.WHITE,
@@ -971,6 +967,8 @@ def main(page: ft.Page):
         on_click=speech_button_clicked
     )
 
+    # --- Flet Page auf Nachrichten vorbereiten ---
+    page.on_message = handle_speech_result
 
 
     dialog_gradient = ft.LinearGradient(
