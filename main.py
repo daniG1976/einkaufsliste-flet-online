@@ -85,58 +85,6 @@ def speech_to_text(audio_bytes, encoding=speech.RecognitionConfig.AudioEncoding.
     return ""
 
 
-# Status-Textfeld (direkt im Dialog)
-
-
-# --- Browser / iPhone Sprachaufnahme ---
-async def start_browser_recording(page: ft.Page):
-    js_code = f"""
-    (async () => {{
-        const sendMessage = (type, message) => {{
-            window.parent.postMessage({{ type: type, text: message }}, "*");
-        }};
-        try {{
-            sendMessage("speech_status", "Versuche Zugriff auf Mikrofon...");
-            const stream = await navigator.mediaDevices.getUserMedia({{ audio: true }});
-            sendMessage("speech_status", "Mikrofonzugriff erfolgreich.");
-
-            const mediaRecorder = new MediaRecorder(stream);
-            let chunks = [];
-            mediaRecorder.ondataavailable = e => {{ if (e.data.size > 0) chunks.push(e.data); }};
-            mediaRecorder.onstop = async () => {{
-                sendMessage("speech_status", "Aufnahme beendet, verarbeite Audio...");
-                const blob = new Blob(chunks, {{ type: "audio/webm" }});
-                const reader = new FileReader();
-                reader.onloadend = async () => {{
-                    const base64data = reader.result.split(",")[1];
-                    sendMessage("speech_status", "Sende Audio an Server...");
-                    try {{
-                        const response = await fetch("https://meine-einkaufsliste.onrender.com/upload_audio", {{
-                            method: "POST",
-                            headers: {{ "Content-Type": "application/json" }},
-                            body: JSON.stringify({{ audio: base64data }})
-                        }});
-                        const result = await response.json();
-                        const recognized = result.text || "";
-                        sendMessage("speech_result", recognized);
-                    }} catch (err) {{
-                        sendMessage("speech_error", "Server-Fehler: " + err.message);
-                    }}
-                }};
-                reader.readAsDataURL(blob);
-            }};
-            mediaRecorder.start();
-            setTimeout(() => mediaRecorder.stop(), 3000);
-        }} catch (err) {{
-            let errorMessage = err.name + ": " + err.message; // <-- NEU
-            sendMessage("speech_error", "Mikrofonzugriff fehlgeschlagen: " + errorMessage); // <-- NEU
-        }}
-    }})();
-    """.replace("\n", "")
-    
-    await page.eval_js(js_code)
-
-
 
 class ShoppingItem:
     def __init__(self, name: str, amount: str, unit: str, is_offer: bool):
@@ -975,17 +923,10 @@ def main(page: ft.Page):
 
 
     async def speech_button_clicked(e):
-
-        # WICHTIG: Den 'async' Aufruf direkt in den Klick-Handler legen
-        # (Nur der Web-Teil wird ausgeführt, wenn Flet als Web-App läuft)
-        
-        # 1. Plattform-Prüfung
-        if platform.system() in ["Windows", "Linux", "Darwin"]:  # Desktop (Windows, Linux, macOS)
-            print("Desktop-Spracherkennung gestartet.")
-            # Bei Desktop/lokalem Start wird die Audioaufnahme synchron ausgeführt.
-            # Keine Notwendigkeit für das Web-JS-Skript.
+        # Desktop-Logik: Bleibt unverändert
+        if platform.system() in ["Windows", "Linux", "Darwin"]:
             try:
-                # Hier müsste Ihre bestehende synchrone Logik stehen
+                print("Desktop-Spracherkennung gestartet.")
                 audio = record_audio(duration=3)
                 if audio:
                     text = speech_to_text(audio)
@@ -994,16 +935,63 @@ def main(page: ft.Page):
                         new_item_name_input.current.update()
             except Exception as ex:
                 print(f"Desktop Speech Error: {ex}")
-                # Optional: Feedback im Dialog anzeigen, falls lokal ein Fehler auftritt
+            return # Wichtig: Hier aufhören, wenn Desktop
+
+        # iOS / Web Logik (Extrem aggressive JS-Ausführung)
+        print("iOS/Web Spracherkennung (direktes JS-Eval) gestartet.")
+        
+        # Der komplette JS-Code-String wird hier direkt definiert
+        js_code = f"""
+        (async () => {{
+            const sendMessage = (type, message) => {{
+                window.parent.postMessage({{ type: type, text: message }}, "*");
+            }};
+            try {{
+                // Zuerst den Status auf 'Versuche Zugriff...' setzen
+                sendMessage("speech_status", "Versuche Zugriff auf Mikrofon...");
                 
-        else:  # Web / iOS / Android (nutzt den Browser-Kontext)
-            print("Web-Spracherkennung (via JavaScript) gestartet.")
-            # Führt die asynchrone JS-Aufnahme direkt aus.
-            # Dies hält die notwendige Verbindung zum Benutzer-Klick-Event aufrecht.
-            await start_browser_recording(e.page) # Wichtig: 'e.page' an die Funktion übergeben
-
-
-
+                // Kritischer Teil: Mikrofonzugriff
+                const stream = await navigator.mediaDevices.getUserMedia({{ audio: true }});
+                sendMessage("speech_status", "Mikrofonzugriff erfolgreich.");
+                
+                // Rest der Aufnahmelogik
+                const mediaRecorder = new MediaRecorder(stream);
+                let chunks = [];
+                mediaRecorder.ondataavailable = e => {{ if (e.data.size > 0) chunks.push(e.data); }};
+                mediaRecorder.onstop = async () => {{
+                    sendMessage("speech_status", "Aufnahme beendet, verarbeite Audio...");
+                    const blob = new Blob(chunks, {{ type: "audio/webm" }});
+                    const reader = new FileReader();
+                    reader.onloadend = async () => {{
+                        const base64data = reader.result.split(",")[1];
+                        sendMessage("speech_status", "Sende Audio an Server...");
+                        try {{
+                            const response = await fetch("https://meine-einkaufsliste.onrender.com/upload_audio", {{
+                                method: "POST",
+                                headers: {{ "Content-Type": "application/json" }},
+                                body: JSON.stringify({{ audio: base64data }})
+                            }});
+                            const result = await response.json();
+                            const recognized = result.text || "";
+                            sendMessage("speech_result", recognized);
+                        }} catch (err) {{
+                            sendMessage("speech_error", "Server-Fehler: " + err.message);
+                        }}
+                    }};
+                    reader.readAsDataURL(blob);
+                }};
+                mediaRecorder.start();
+                setTimeout(() => mediaRecorder.stop(), 3000);
+            }} catch (err) {{
+                // Sehr wichtiger Fehlerpfad, inklusive Fehlertyp (Name)
+                let errorMessage = err.name + ": " + err.message;
+                sendMessage("speech_error", "Mikrofonzugriff fehlgeschlagen: " + errorMessage);
+            }}
+        }})();
+        """.replace("\n", "")
+        
+        # DIREKTER AUFRUF, um die Verbindung zum Klick-Event zu maximieren
+        await e.page.eval_js(js_code)
 
     # --- IconButton im Dialog ---
     speech_add_button = ft.IconButton(
