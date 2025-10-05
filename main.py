@@ -1130,7 +1130,14 @@ def main(page: ft.Page):
         content_padding=ft.padding.all(10),
         )
 
+    speech_status_text = ft.Text(value="Bereit für Spracheingabe.", color=ft.Colors.WHITE, size=14)
 
+    test_speech_button = ft.FloatingActionButton(
+        icon=ft.Icons.MIC,
+        on_click=speech_button_clicked, # Benutzt Ihre korrigierte Funktion
+        tooltip="Spracheingabe Test"
+    )
+    
     def route_change(route):
 
         page.views.clear()
@@ -1246,6 +1253,8 @@ def main(page: ft.Page):
                                     padding=12,
 
                                 ),
+                                speech_status_text,
+                                test_speech_button,
 
                             ],
 
