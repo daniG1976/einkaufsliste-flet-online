@@ -88,60 +88,38 @@ def speech_to_text(audio_bytes, encoding=speech.RecognitionConfig.AudioEncoding.
 
 async def start_browser_recording(page: ft.Page, textfield: ft.TextField):
     js_code = """
-    async function recordAudio() {
+    (async function(){
         try {
-            console.log("🎯 Starte Mikrofonanfrage...");
+            alert("🎯 Starte Mikrofon...");
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            console.log("🎙️ Mikrofonzugriff OK, starte Aufnahme...");
-            alert("Aufnahme startet...");
-
+            alert("🎙️ Zugriff erlaubt!");
             const mediaRecorder = new MediaRecorder(stream);
             let chunks = [];
-
-            mediaRecorder.ondataavailable = e => { 
-                if (e.data.size > 0) chunks.push(e.data); 
-            };
-
+            mediaRecorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
             mediaRecorder.onstop = async () => {
-                console.log("🛑 Aufnahme beendet, sende Daten...");
+                alert("⏹️ Aufnahme beendet – sende an Server...");
                 const blob = new Blob(chunks, { type: "audio/webm" });
                 const reader = new FileReader();
                 reader.onloadend = async () => {
                     const base64data = reader.result.split(",")[1];
-                    try {
-                        const response = await fetch("https://meine-einkaufsliste.onrender.com/upload_audio", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ audio: base64data })
-                        });
-                        const result = await response.json();
-                        console.log("✅ Antwort vom Server:", result);
-                        alert("Text erkannt: " + (result.text || "— keine Sprache erkannt —"));
-                        if (result.text) {
-                            fetch(`/set_text?text=${encodeURIComponent(result.text)}`);
-                        }
-                    } catch (err) {
-                        console.error("❌ Fehler beim Upload:", err);
-                        alert("Fehler beim Upload: " + err.message);
-                    }
+                    const response = await fetch("https://meine-einkaufsliste.onrender.com/upload_audio", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ audio: base64data })
+                    });
+                    const result = await response.json();
+                    alert("Text erkannt: " + (result.text || "— nichts erkannt —"));
                 };
                 reader.readAsDataURL(blob);
             };
-
             mediaRecorder.start();
-            setTimeout(() => mediaRecorder.stop(), 3000);
-        } catch (err) {
-            console.error("❌ Mikrofonfehler:", err);
-            alert("Mikrofonfehler: " + err.message);
+            setTimeout(()=>mediaRecorder.stop(), 3000);
+        } catch(err){
+            alert("Fehler: " + err.message);
         }
-    }
-    recordAudio();
-    """
-    page.window_run_js(js_code)
-
-
-
-
+    })();
+    """.replace("\n", "")
+    page.launch_url(f"javascript:{js_code}")
 
 
 class ShoppingItem:
