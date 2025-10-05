@@ -88,40 +88,52 @@ def speech_to_text(audio_bytes, encoding=speech.RecognitionConfig.AudioEncoding.
 
 # --- Browser / iPhone Sprachaufnahme ---
 async def start_browser_recording(page: ft.Page):
-    js_code = """
-    (async () => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    js_code = f"""
+    (async () => {{
+        const sendMessage = (type, message) => {{
+            window.parent.postMessage({{ type: type, text: message }}, "*");
+        }};
+
+        try {{
+            sendMessage("speech_status", "Versuche Zugriff auf Mikrofon...");
+            const stream = await navigator.mediaDevices.getUserMedia({{ audio: true }});
+            sendMessage("speech_status", "Mikrofonzugriff erfolgreich.");
+
             const mediaRecorder = new MediaRecorder(stream);
             let chunks = [];
 
-            mediaRecorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-
-            mediaRecorder.onstop = async () => {
-                const blob = new Blob(chunks, { type: "audio/webm" });
+            mediaRecorder.ondataavailable = e => {{ if (e.data.size > 0) chunks.push(e.data); }};
+            mediaRecorder.onstop = async () => {{
+                sendMessage("speech_status", "Aufnahme beendet, verarbeite Audio...");
+                const blob = new Blob(chunks, {{ type: "audio/webm" }});
                 const reader = new FileReader();
-                reader.onloadend = async () => {
+                reader.onloadend = async () => {{
                     const base64data = reader.result.split(",")[1];
-                    const response = await fetch("https://meine-einkaufsliste.onrender.com/upload_audio", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ audio: base64data })
-                    });
-                    const result = await response.json();
-                    const recognized = result.text || "";
-                    window.parent.postMessage({ type: "speech_result", text: recognized }, "*");
-                };
+                    sendMessage("speech_status", "Sende Audio an Server...");
+                    try {{
+                        const response = await fetch("https://meine-einkaufsliste.onrender.com/upload_audio", {{
+                            method: "POST",
+                            headers: {{ "Content-Type": "application/json" }},
+                            body: JSON.stringify({{ audio: base64data }})
+                        }});
+                        const result = await response.json();
+                        const recognized = result.text || "";
+                        sendMessage("speech_result", recognized);
+                    }} catch (err) {{
+                        sendMessage("speech_error", "Server-Fehler: " + err.message);
+                    }}
+                }};
                 reader.readAsDataURL(blob);
-            };
+            }};
 
             mediaRecorder.start();
             setTimeout(() => mediaRecorder.stop(), 3000);
-        } catch (err) {
-            window.parent.postMessage({ type: "speech_error", message: err.message }, "*");
-        }
-    })();
+        }} catch (err) {{
+            sendMessage("speech_error", "Mikrofonzugriff fehlgeschlagen: " + err.message);
+        }}
+    }})();
     """.replace("\n", "")
-
+    
     await page.eval_js(js_code)
 
 
@@ -938,17 +950,20 @@ def main(page: ft.Page):
     # --- Callback für Browser / Desktop Messages ---
     async def handle_speech_result(e):
         data = e.data
-        if isinstance(data, dict) and data.get("type") == "speech_result":
-            recognized_text = data.get("text", "")
-            text1.value = recognized_text
-            page.update()
-        elif isinstance(data, dict) and data.get("type") == "speech_error":
-            print("Speech error:", data.get("message"))
-
+        if isinstance(data, dict):
+            if data.get("type") == "speech_result":
+                text1.value = data.get("text", "")
+                page.update()
+            elif data.get("type") == "speech_error":
+                text1.value = f"Fehler: {data.get('text')}"
+                page.update()
+            elif data.get("type") == "speech_status":
+                text1.value = f"Status: {data.get('text')}"
+                page.update()
 
     # --- Button-Callback Sprachaufnahme ---
     def speech_button_clicked(e):
-        if platform.system() in ["Windows", "Linux", "Darwin"]:  # Desktop
+        if platform.system() in ["Windows", "Linux", "Darwin"]:
             audio = record_audio(duration=3)
             if audio:
                 text = speech_to_text(audio)
